@@ -25,7 +25,7 @@
     "ASM-005: 分辨率配置通过游戏内选项菜单切换 —— 已在 FR-017 中覆盖"
   ],
   "required_configs": [],
-  "current": {"feature_id": 1, "phase": "st"},
+  "current": null,
   "features": [
     {
       "id": 1,
@@ -33,7 +33,7 @@
       "title": "Engine Core",
       "description": "Initialize Macroquad window with virtual render target, establish 60fps fixed-timestep game loop with accumulator (max 5 catch-up steps), coordinate state-machine update → physics → render pipeline each frame. Respond to display config changes (IAPI-011).",
       "priority": "high",
-      "status": "failing",
+      "status": "passing",
       "srs_trace": ["FR-018"],
       "verification_steps": [
         "Given 游戏运行中, When 系统时钟推进 1 秒, Then 模拟步进恰好执行 60 次 (固定 dt=1/60s)",
@@ -44,7 +44,10 @@
       "dependencies": [],
       "ui": false,
       "est_loc": 920,
-      "band": "ok"
+      "band": "ok",
+      "git_sha": "30a2c5e",
+      "st_case_path": "docs/test-cases/feature-1-engine-core.md",
+      "st_case_count": 13
     },
     {
       "id": 2,

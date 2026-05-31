@@ -45,3 +45,13 @@
 - TDD: green ✓ (R-G-R complete) — 12 tests, categories=FUNC/happy+BNDRY/edge+PERF/frame-time, negative_ratio=0.50
 - Quality: line=80.56%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-018)
 - current.phase: tdd → st
+
+### Feature #1: Engine Core — PASS
+- Completed: 2026-05-31
+- TDD: green ✓
+- Quality Gates: 80.56% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 13 cases, all PASS
+- Inline Check: PASS (P2: 3/3 methods, T2: 13/13 tests, D3: OK, ATS Category: 3/3, §4: 4 files 0 violations)
+- Git: 30a2c5e feat: feature #1 engine-core — ST passed (13/13 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis

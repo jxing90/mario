@@ -4,6 +4,7 @@
 
 ### Added
 - Initial project scaffold
+- Feature #1: Engine Core — 60fps fixed-timestep game loop with accumulator (max 5 catch-up steps), virtual 480x270 render target, display config support (IAPI-011), 13/13 ST cases passing
 
 ### Changed
 - (none yet)
