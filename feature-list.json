@@ -25,7 +25,7 @@
     "ASM-005: 分辨率配置通过游戏内选项菜单切换 —— 已在 FR-017 中覆盖"
   ],
   "required_configs": [],
-  "current": {"feature_id": 2, "phase": "st"},
+  "current": null,
   "features": [
     {
       "id": 1,
@@ -55,7 +55,7 @@
       "title": "Level & Background",
       "description": "Define single-level platform geometry, level bounds (min_x, max_x, kill_y), and 3-layer parallax background textures as hardcoded constants. Provide terrain query (IAPI-005) for physics collision and level bounds (IAPI-008) for camera clamping.",
       "priority": "high",
-      "status": "failing",
+      "status": "passing",
       "srs_trace": ["FR-006"],
       "verification_steps": [
         "Given 玩家从上方向下落接触平台顶部表面, When 玩家碰撞体底部与平台顶部碰撞体重叠, Then 玩家停在平台表面且垂直速度归零，可水平移动和跳跃",
@@ -66,7 +66,10 @@
       "dependencies": [],
       "ui": false,
       "est_loc": 1080,
-      "band": "ok"
+      "band": "ok",
+      "git_sha": "47840fb",
+      "st_case_path": "docs/test-cases/feature-2-level-background.md",
+      "st_case_count": 17
     },
     {
       "id": 3,
