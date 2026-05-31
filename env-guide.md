@@ -1,7 +1,7 @@
 ---
 version: 1.1
 approved_by: jxing
-approved_date: 2026-05-31
+approved_date: 2026-06-01
 approved_sections: ["§3", "§4"]
 ---
 
