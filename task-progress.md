@@ -66,3 +66,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/2-level-background.md)
 - current.phase: design → tdd
+
+### Session 4 — TDD #2 (2026-05-31)
+
+- **Feature #2: Level & Background** (FR-006) — 关卡几何 + 3层视差背景
+- **Status**: failing
+- **Dependencies**: none
+- TDD: green ✓ (R-G-R complete) — 17 tests, categories=FUNC/happy=9+FUNC/error=1+BNDRY/edge=7, negative_ratio=0.47
+- Quality: line=89.02%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-006)
+- current.phase: tdd → st
