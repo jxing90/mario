@@ -25,3 +25,14 @@
 **Sizing**: 3 large features retained per Design rationale (F03 Player, F06 Life/Death/Win, F08 Collectibles & Blocks)
 
 **Artifacts**: feature-list.json, env-guide.md, long-task-guide.md, init.sh, init.ps1, .env.example, .gitignore, scripts/, Cargo.toml, src/ skeleton
+
+### Session 1 — Feature Design #1 (2026-05-31)
+
+- **Feature #1: Engine Core** (FR-018) — 60fps fixed-timestep game loop
+- **SRS**: §FR-018 (lines 269-278)
+- **Design §2.1**: (lines 98-117)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/1-engine-core.md)
+- current.phase: design → tdd
