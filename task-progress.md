@@ -55,3 +55,14 @@
 - Git: 30a2c5e feat: feature #1 engine-core — ST passed (13/13 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+
+### Session 3 — Feature Design #2 (2026-05-31)
+
+- **Feature #2: Level & Background** (FR-006) — 关卡几何 + 3层视差背景
+- **SRS**: §FR-006 (lines 133-142)
+- **Design §2.2**: (lines 119-141)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/2-level-background.md)
+- current.phase: design → tdd
