@@ -410,11 +410,15 @@ graph LR
     F01[F01 Engine<br/>P0] --> F03[F03 Player<br/>P1]
     F01 --> F10[F10 Display<br/>P2]
     F02[F02 Level<br/>P0] --> F03
+    F02 --> F04[F04 Camera<br/>P1]
     F02 --> F05[F05 Hazards<br/>P1]
-    F03 --> F04[F04 Camera<br/>P1]
-    F03 --> F06[F06 Life/Death/Win<br/>P1]
-    F03 --> F07[F07 Enemy<br/>P2]
-    F03 --> F08[F08 Collectibles<br/>P2]
+    F02 --> F06[F06 Life/Death/Win<br/>P1]
+    F02 --> F07[F07 Enemy<br/>P2]
+    F02 --> F08[F08 Collectibles<br/>P2]
+    F03 --> F04
+    F03 --> F06
+    F03 --> F07
+    F03 --> F08
     F03 --> F09[F09 HUD<br/>P2]
     F05 --> F06
     F06 --> F09
