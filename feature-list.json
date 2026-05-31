@@ -1,0 +1,299 @@
+{
+  "project": "Mario 2D Platformer Demo",
+  "created": "2026-05-31",
+  "single_round": false,
+  "tech_stack": {
+    "language": "rust",
+    "test_framework": "cargo test",
+    "coverage_tool": "cargo-tarpaulin"
+  },
+  "quality_gates": {
+    "line_coverage_min": 80,
+    "branch_coverage_min": 70
+  },
+  "constraints": [
+    "CON-001: 使用 Rust 语言 (edition 2024) 开发 —— 项目技术栈选型决策",
+    "CON-002: 使用 Macroquad 游戏框架 (0.4) —— 极简 Rust 游戏框架，即时模式 API，无需复杂 ECS 架构",
+    "CON-003: 目标平台为 Windows 桌面 (.exe 二进制) —— 本版本仅支持 Windows；无 Linux/macOS/Web 构建目标",
+    "CON-004: 无外部 Web 服务或网络依赖 —— 游戏为纯本地离线运行，不需要互联网连接"
+  ],
+  "assumptions": [
+    "ASM-001: 仅支持单一本地玩家，无分屏或热座模式 —— 若需多人支持需重新设计输入处理、摄像机和 HUD",
+    "ASM-002: 玩家使用标准 QWERTY 键盘操作 —— 若需手柄或其他键盘布局需可配置键位映射",
+    "ASM-003: 关卡仅有一个 (无世界地图、无关卡选择) —— 若需多关卡需关卡加载系统和世界地图 UI",
+    "ASM-004: 关卡设计数据以硬编码或静态配置文件形式嵌入，无运行时关卡编辑器 —— 若需编辑器需独立工具和序列化格式",
+    "ASM-005: 分辨率配置通过游戏内选项菜单切换 —— 已在 FR-017 中覆盖"
+  ],
+  "required_configs": [],
+  "current": null,
+  "features": [
+    {
+      "id": 1,
+      "category": "core",
+      "title": "Engine Core",
+      "description": "Initialize Macroquad window with virtual render target, establish 60fps fixed-timestep game loop with accumulator (max 5 catch-up steps), coordinate state-machine update → physics → render pipeline each frame. Respond to display config changes (IAPI-011).",
+      "priority": "high",
+      "status": "failing",
+      "srs_trace": ["FR-018"],
+      "verification_steps": [
+        "Given 游戏运行中, When 系统时钟推进 1 秒, Then 模拟步进恰好执行 60 次 (固定 dt=1/60s)",
+        "Given 渲染帧率短暂下降, When 渲染跟不上模拟频率, Then 模拟继续以固定步长累进，物体运动不因帧率波动而变速",
+        "Given 模拟单次步进耗时超过固定时间步长, When 累积时间持续增长, Then 系统将单帧模拟步数限制在最大值 5 次，超出部分的时间被丢弃",
+        "Given 游戏循环启动, When 第一帧渲染前, Then 时间累加器初始化为 0，模拟与渲染时基对齐"
+      ],
+      "dependencies": [],
+      "ui": false,
+      "est_loc": 920,
+      "band": "ok"
+    },
+    {
+      "id": 2,
+      "category": "core",
+      "title": "Level & Background",
+      "description": "Define single-level platform geometry, level bounds (min_x, max_x, kill_y), and 3-layer parallax background textures as hardcoded constants. Provide terrain query (IAPI-005) for physics collision and level bounds (IAPI-008) for camera clamping.",
+      "priority": "high",
+      "status": "failing",
+      "srs_trace": ["FR-006"],
+      "verification_steps": [
+        "Given 玩家从上方向下落接触平台顶部表面, When 玩家碰撞体底部与平台顶部碰撞体重叠, Then 玩家停在平台表面且垂直速度归零，可水平移动和跳跃",
+        "Given 玩家站在平台上, When 玩家水平移动至平台边缘之外, Then 玩家失去平台支撑并开始下落",
+        "Given 玩家在平台下方, When 玩家向上跳跃头顶接触到平台底部, Then 玩家垂直速度归零并开始下落（不可穿越平台）",
+        "Given 玩家水平移动, When 玩家侧面碰撞平台侧边碰撞体, Then 玩家水平移动被阻挡（不可穿墙）"
+      ],
+      "dependencies": [],
+      "ui": false,
+      "est_loc": 1080,
+      "band": "ok"
+    },
+    {
+      "id": 3,
+      "category": "core",
+      "title": "Player Controller",
+      "description": "Manage player entity: horizontal movement (acceleration/friction/reversal), variable-height jump (hold duration controls height, ceiling collision), sprint (1.5x speed, jump distance bonus), ground/air state transitions. Output PlayerStats (IAPI-009) for HUD and pos() (IAPI-007) for camera. Power-up state machine: Small ↔ Super ↔ Fire.",
+      "priority": "high",
+      "status": "failing",
+      "srs_trace": ["FR-001", "FR-002", "FR-003"],
+      "verification_steps": [
+        "Given 玩家站立在平台上且处于静止状态, When 按住右箭头或 D 键, Then 玩家在 0.3s 内加速至最大向右速度并保持匀速移动",
+        "Given 玩家正以最大速度向右移动, When 释放所有水平方向输入, Then 玩家在 0.2s 内因摩擦力减速至完全静止",
+        "Given 同时按住左箭头和右箭头, When 两个方向键同时激活, Then 系统优先处理最后按下的方向，或使玩家减速至静止",
+        "Given 玩家处于空中, When 按住水平方向键, Then 玩家获得在地面加速度 60% 的空中水平控制力",
+        "Given 玩家站立在平台上, When 轻按空格键 (<100ms), Then 玩家上升至基础跳跃高度的约 40% 后开始下落",
+        "Given 玩家站立在平台上, When 按住空格不放, Then 玩家上升至最大跳跃高度并在最高点短暂悬停后开始下落",
+        "Given 玩家处于空中, When 按下空格键, Then 玩家不应再次起跳（无无限跳跃）",
+        "Given 玩家在跳跃过程中头顶接触天花板, When 玩家垂直速度向上且头部碰撞体碰撞上方几何体, Then 垂直速度立即归零，玩家开始下落",
+        "Given 玩家在地面且按住 Shift, When 同时按住右箭头, Then 玩家最大水平速度为基础速度的 1.5 倍",
+        "Given 玩家在冲刺中起跳, When 按住 Shift + 空格, Then 玩家跳跃的水平位移比不冲刺时增加约 50%"
+      ],
+      "dependencies": [1, 2],
+      "ui": false,
+      "est_loc": 2800,
+      "band": "large"
+    },
+    {
+      "id": 4,
+      "category": "core",
+      "title": "Camera System",
+      "description": "Read Player position (IAPI-007), follow horizontally with 8%/frame convergence (player at 35-40% viewport left), vertical dead-zone covering central 60% of viewport (track at 5%/frame only when player exits zone). Clamp to level bounds (IAPI-008). Output camera offset (IAPI-010) for parallax rendering.",
+      "priority": "high",
+      "status": "failing",
+      "srs_trace": ["FR-013"],
+      "verification_steps": [
+        "Given 玩家向右移动, When 玩家 X 坐标增加, Then 摄像机水平位置每帧向目标位置收敛剩余距离的 8%，追赶延迟不超过 80 像素",
+        "Given 玩家静止, When 玩家 X 坐标不变, Then 摄像机收敛至目标位置并完全静止（无振荡）",
+        "Given 玩家移动到关卡最左边界, When 玩家 X 坐标 ≤ 关卡最小 X 值 + 视口偏移, Then 摄像机停止在关卡左边界，左侧不显示关卡外区域",
+        "Given 玩家移动到关卡最右边界, When 玩家 X 坐标 ≥ 关卡最大 X 值 − 视口偏移, Then 摄像机停止在关卡右边界，右侧不显示关卡外区域",
+        "Given 玩家执行垂直跳跃, When 玩家 Y 坐标超出视口中央 60% 的垂直死区, Then 摄像机每帧以剩余垂直距离 5% 的速率追赶玩家 Y 坐标；当玩家在死区内时摄像机垂直位置保持不变"
+      ],
+      "dependencies": [3, 2],
+      "ui": false,
+      "est_loc": 1160,
+      "band": "ok"
+    },
+    {
+      "id": 5,
+      "category": "core",
+      "title": "Hazards",
+      "description": "Spike entities as static danger colliders (16x8 px). Kill-plane at level Y lower bound. On player-spike overlap or player Y > kill_y, emit collision event (HazardContact / PitFall) triggering death flow. Invulnerability exempts damage during 2s window.",
+      "priority": "high",
+      "status": "failing",
+      "srs_trace": ["FR-009"],
+      "verification_steps": [
+        "Given 玩家接触到尖刺或地面陷阱, When 碰撞体与危险区域重叠, Then 玩家立即死亡并触发重生流程 (FR-014b)",
+        "Given 玩家跳跃越过尖刺, When 玩家轨迹不与尖刺碰撞体相交, Then 玩家安全通过，不受伤",
+        "Given 玩家落入无底深渊 (Y 坐标超过死亡平面), When 玩家完全离开可见区域, Then 玩家立即死亡并触发重生流程",
+        "Given 玩家在重生后的无敌时间内, When 玩家处于无敌状态时接触危险, Then 玩家不受伤"
+      ],
+      "dependencies": [2, 3],
+      "ui": false,
+      "est_loc": 920,
+      "band": "ok"
+    },
+    {
+      "id": 6,
+      "category": "core",
+      "title": "Life, Death & Win",
+      "description": "Manage lives counter (initial 3), checkpoint activation, death animation (1.5s input lock), life decrement → respawn at checkpoint (2s invulnerability + flicker 4Hz) or Game Over (lives=0). Flagpole trigger → slide animation → Victory screen with coin total + restart prompt. GameOver/Victory screens respond to Space for full state reset.",
+      "priority": "high",
+      "status": "failing",
+      "srs_trace": ["FR-014a", "FR-014b", "FR-014c", "FR-015"],
+      "verification_steps": [
+        "Given 玩家有 N 条命且接触到即死危险, When 死亡触发, Then 生命数从 N 减至 N-1",
+        "Given 死亡动画播放中, When 动画持续 1.5s, Then 玩家输入被锁定，玩家不可操控",
+        "Given 死亡动画完成且生命数 > 0, When 动画结束, Then 系统转入重生流程：在最近激活的检查点或关卡起点重生，授予 2s 无敌闪烁",
+        "Given 死亡动画完成且生命数 = 0, When 动画结束, Then 系统显示 Game Over 画面",
+        "Given 玩家死亡后生命数 > 0, When 死亡动画结束, Then 玩家在最近激活的检查点位置重生；若未激活任何检查点，则在关卡起点重生",
+        "Given 玩家重生完成, When 重生后 2 秒内, Then 玩家处于无敌状态（角色闪烁），期间接触敌人或危险不受伤",
+        "Given 玩家生命数减至 0, When 死亡动画结束, Then 系统显示 Game Over 画面覆盖层",
+        "[devtools] /game-over-overlay | EXPECT: Game Over 文字、Press Space to Restart 提示 | REJECT: 原有游戏画面残留、HUD 叠加、渲染模糊",
+        "Given Game Over 画面显示中, When 玩家按下空格键, Then 游戏完全重置：3 条命、0 金币、关卡从头开始",
+        "Given 玩家到达关卡终点旗杆, When 玩家碰撞体与旗杆触发区域重叠, Then 玩家输入被锁定，播放旗杆滑下动画",
+        "Given 旗杆动画播放完成, When 胜利画面渲染完成, Then 显示 Victory! 标题、本次金币收集总数，以及 Press Space to Play Again 提示",
+        "[devtools] /victory-overlay | EXPECT: Victory 文字、总金币数、Press Space to Play Again 提示 | REJECT: 原有 HUD 残留、死亡动画残留、渲染异常"
+      ],
+      "dependencies": [3, 2, 5],
+      "ui": true,
+      "ui_entry": "/game-over-overlay",
+      "est_loc": 3140,
+      "band": "large"
+    },
+    {
+      "id": 7,
+      "category": "core",
+      "title": "Patrol Enemy",
+      "description": "Enemy walks between two waypoints at constant speed (reverses at endpoint ≤1 frame). Collision direction-dependent: player lands from above (downward velocity > 0, player bottom vs enemy top) → enemy destroyed + player bounce; side/below contact → player death.",
+      "priority": "medium",
+      "status": "failing",
+      "srs_trace": ["FR-010"],
+      "verification_steps": [
+        "Given 敌人在地面巡逻, When 无玩家干扰, Then 敌人在 A-B 两点间以恒定速度往复移动，到达端点时转向 (≤1帧内方向翻转)",
+        "Given 玩家从上方落在敌人头顶, When 玩家向下速度 > 0 且玩家底部碰撞体接触敌人顶部碰撞体, Then 敌人被消灭并从场景移除，玩家获得小幅向上反弹",
+        "Given 玩家从侧面接触敌人, When 玩家水平方向与敌人碰撞体重叠且非从上方踩踏, Then 玩家受到伤害（立即死亡），触发死亡流程",
+        "Given 玩家从下方接触敌人, When 玩家顶部碰撞体接触敌人底部, Then 玩家受到伤害（立即死亡），触发死亡流程"
+      ],
+      "dependencies": [2, 3, 6],
+      "ui": false,
+      "est_loc": 1180,
+      "band": "ok"
+    },
+    {
+      "id": 8,
+      "category": "core",
+      "title": "Collectibles & Blocks",
+      "description": "Coins placed in level: collected on player collision → deactivate + coin counter +1; reset on player death & respawn. Question blocks: hit from below by player head → deactivate (show 'used' state), roll loot table (Coin 70% / Super Mushroom 15% / Fire Flower 15%), spawn reward above block. Super Mushroom bounces along ground, Fire Flower stays static at spawn position.",
+      "priority": "medium",
+      "status": "failing",
+      "srs_trace": ["FR-008", "FR-011"],
+      "verification_steps": [
+        "Given 玩家移动到金币所在位置, When 玩家碰撞体与金币碰撞体重叠, Then 金币从场景中移除且 HUD 金币计数 +1",
+        "Given 金币已被收集, When 玩家在同一位置再次经过, Then 金币不再出现（已收集状态持久化至关卡结束）",
+        "Given 玩家死亡并重生, When 玩家回到之前收集过金币的区域, Then 金币重新出现（重生复位金币）",
+        "Given 玩家从下方头顶撞击问号方块, When 玩家头部碰撞体接触方块底部且方块未使用, Then 方块切换为已使用状态，按概率表随机产出奖励（金币70%、蘑菇15%、火焰花15%），玩家轻微弹回",
+        "Given 问号方块已被激活过, When 玩家再次头顶撞击, Then 方块不再产生任何物品（保持已使用状态）",
+        "Given 玩家从上方或侧面接触问号方块, When 接触方向不是从下向上, Then 方块不被激活，行为与普通固定平台一致",
+        "Given 方块产出超级蘑菇, When 蘑菇在地面弹跳移动并接触玩家, Then 玩家角色变大 (碰撞体 16x16 → 16x32)，可承受一次伤害（受伤后恢复原大小）",
+        "Given 方块产出火焰花, When 火焰花在方块上方生成并接触玩家, Then 玩家获得发射火球能力，火球水平飞行可消灭路径上的敌人"
+      ],
+      "dependencies": [2, 3],
+      "ui": false,
+      "est_loc": 2040,
+      "band": "large"
+    },
+    {
+      "id": 9,
+      "category": "core",
+      "title": "HUD",
+      "description": "Read PlayerStats { coins, lives } from Player (IAPI-009), render coin icon + count and heart icon + lives as screen-space overlay anchored at viewport (3%, 3%) with tolerance ±2%. Update immediately within current frame on value changes. Use 1px black-outline pixel font.",
+      "priority": "medium",
+      "status": "failing",
+      "srs_trace": ["FR-016"],
+      "verification_steps": [
+        "Given 游戏开始, When 关卡加载完成, Then HUD 显示金币计数为 0、生命计数为 3，锚定于视口 (3%, 3%) 位置",
+        "Given 玩家收集一枚金币, When 金币碰撞事件触发, Then HUD 金币计数在当前帧内 +1",
+        "Given 玩家死亡, When 生命数减 1, Then HUD 生命计数在当前帧内 −1",
+        "Given 玩家重生或游戏重置, When 状态重置, Then HUD 显示重置后的金币与生命数值",
+        "[devtools] /game-hud | EXPECT: 金币图标+数字位于视口 (3%, 3%) 锚定位置、偏差 ≤ ±2% 视口宽高，心形图标+生命数字紧随金币右侧 | REJECT: HUD 元素偏移超出 ±2% 容差、字体模糊/非像素风格、帧更新延迟超过 1 帧"
+      ],
+      "dependencies": [3, 6],
+      "ui": true,
+      "ui_entry": "/game-hud",
+      "est_loc": 920,
+      "band": "ok"
+    },
+    {
+      "id": 10,
+      "category": "core",
+      "title": "Display Config",
+      "description": "ESC toggles options menu overlay. Display current resolution, selectable list (720p/1080p/1440p), and fullscreen toggle. Arrow keys navigate, Enter confirms → immediately apply via IAPI-011 with nearest-neighbor scaling. ESC again closes menu.",
+      "priority": "medium",
+      "status": "failing",
+      "srs_trace": ["FR-017"],
+      "verification_steps": [
+        "Given 游戏运行中, When 玩家按下 ESC, Then 显示选项菜单覆盖层，含当前分辨率、可选分辨率列表 (720p/1080p/1440p) 和全屏开关",
+        "Given 玩家在选项菜单中选择新分辨率, When 玩家按 Enter 确认, Then 游戏窗口调整至所选分辨率，所有内容以最近邻方式缩放",
+        "Given 玩家在选项菜单中开启全屏, When 玩家按 Enter 确认, Then 游戏切换至当前显示器的原生分辨率全屏模式",
+        "Given 游戏在全屏模式, When 玩家在选项菜单中关闭全屏, Then 游戏回到之前设置的窗口分辨率",
+        "[devtools] /options-menu | EXPECT: 分辨率列表 (720p/1080p/1440p) 文字、全屏开关标签、当前选中项高亮 | REJECT: 菜单覆盖层遮挡游戏画面不完全、字体模糊、ESC 无法关闭菜单"
+      ],
+      "dependencies": [1],
+      "ui": true,
+      "ui_entry": "/options-menu",
+      "est_loc": 1020,
+      "band": "ok"
+    },
+    {
+      "id": 11,
+      "category": "non-functional",
+      "title": "60fps Frame Rate (NFR-001)",
+      "description": "The game shall render at a stable 60 frames per second at target resolution. 99% of frame render times ≤ 16.67ms; any continuous 60-second window shall maintain ≥ 58fps. Built-in FPS counter logs min/max/avg/p99 frame times.",
+      "priority": "high",
+      "status": "failing",
+      "srs_trace": ["NFR-001"],
+      "verification_steps": [
+        "P99 帧时间 ≤ 16.67ms at 720p/1080p/1440p 窗口模式",
+        "任意连续 60s 窗口帧率 ≥ 58fps（Playing 状态满实体）",
+        "全屏模式下帧时间一致性验证"
+      ],
+      "dependencies": [1],
+      "ui": false,
+      "est_loc": 0,
+      "band": "small"
+    },
+    {
+      "id": 12,
+      "category": "non-functional",
+      "title": "Multi-Resolution Display (NFR-002)",
+      "description": "The game shall render correctly at 720p/1080p/1440p windowed and fullscreen modes. HUD anchored at (3%, 3%) viewport position with deviation ≤ ±2% of viewport dimensions. Player visible area occupies 45-50% of viewport width at all resolutions.",
+      "priority": "medium",
+      "status": "failing",
+      "srs_trace": ["NFR-002"],
+      "verification_steps": [
+        "HUD 锚定 (3%, 3%) 偏差 ≤ ±2% 视口 @ 720p/1080p/1440p",
+        "玩家可见区域占视口宽度 45-50% @ all resolutions",
+        "全屏模式 HUD 位置不变"
+      ],
+      "dependencies": [1, 4, 9, 10],
+      "ui": false,
+      "est_loc": 0,
+      "band": "small"
+    },
+    {
+      "id": 13,
+      "category": "non-functional",
+      "title": "Pixel Art Rendering (NFR-003)",
+      "description": "All sprites and level tiles shall use nearest-neighbor interpolation for scaling. At 8x magnification, pixel boundaries appear as solid-color squares with no transition colors or blurred edges. Each sprite ≤ 16 colors.",
+      "priority": "medium",
+      "status": "failing",
+      "srs_trace": ["NFR-003"],
+      "verification_steps": [
+        "精灵 8× 放大后像素边界为纯色正方形，无过渡色/模糊边缘",
+        "所有精灵 ≤ 16 色调色板",
+        "全部三种分辨率下所有精灵类型均通过检查"
+      ],
+      "dependencies": [2],
+      "ui": false,
+      "est_loc": 0,
+      "band": "small"
+    }
+  ]
+}
