@@ -36,3 +36,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/1-engine-core.md)
 - current.phase: design → tdd
+
+### Session 2 — TDD #1 (2026-05-31)
+
+- **Feature #1: Engine Core** (FR-018) — 60fps fixed-timestep game loop
+- **Status**: failing
+- **Dependencies**: none
+- TDD: green ✓ (R-G-R complete) — 12 tests, categories=FUNC/happy+BNDRY/edge+PERF/frame-time, negative_ratio=0.50
+- Quality: line=80.56%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-018)
+- current.phase: tdd → st
