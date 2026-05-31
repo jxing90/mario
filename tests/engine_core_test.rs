@@ -15,7 +15,7 @@
 //   SEC: N/A — internal engine logic, no user-facing input
 //   INTG: N/A — pure engine layer, no external I/O (per design §7)
 
-use mario_platformer::engine::{GameLoop, WindowConfig};
+use mario_platformer::engine::{GameLoop, WindowConfig, WindowError};
 use mario_platformer::state::StateMachine;
 
 // ============================================================================
@@ -372,6 +372,60 @@ fn t5_apply_display_unsupported_resolution_is_noop() {
         gl.window.config.fullscreen, original_fullscreen,
         "apply_display(800,600): fullscreen must be unchanged (was {}, now {})",
         original_fullscreen, gl.window.config.fullscreen
+    );
+}
+
+// ============================================================================
+// ST-FUNC-001-008 — FUNC/error (added during Feature-ST)
+// Traces To: IAPI-011, §Interface Contract GameLoop::new Raises
+// "GameLoop::new with unsupported resolution returns WindowError::UnsupportedResolution"
+//
+// Kills: constructor panicking on bad input instead of returning Err.
+// ============================================================================
+
+// real_test (feature #1)
+#[test]
+fn t_st_func_001_008_unsupported_resolution_error() {
+    // 800x600 is NOT in the supported set {1280x720, 1920x1080, 2560x1440}.
+    let config = WindowConfig {
+        width: 800,
+        height: 600,
+        fullscreen: false,
+    };
+    let result = GameLoop::new(config);
+
+    assert!(
+        result.is_err(),
+        "GameLoop::new(800x600) should return Err"
+    );
+    let err = result.err().unwrap();
+    assert_eq!(
+        err, WindowError::UnsupportedResolution,
+        "GameLoop::new(800x600) should return WindowError::UnsupportedResolution, got {:?}",
+        err
+    );
+
+    // 1024x768 is also unsupported.
+    let config2 = WindowConfig {
+        width: 1024,
+        height: 768,
+        fullscreen: false,
+    };
+    let result2 = GameLoop::new(config2);
+    assert!(result2.is_err());
+    let err2 = result2.err().unwrap();
+    assert_eq!(err2, WindowError::UnsupportedResolution);
+
+    // 1280x720 IS supported — should succeed.
+    let config3 = WindowConfig {
+        width: 1280,
+        height: 720,
+        fullscreen: false,
+    };
+    let result3 = GameLoop::new(config3);
+    assert!(
+        result3.is_ok(),
+        "GameLoop::new(1280x720) should succeed"
     );
 }
 
