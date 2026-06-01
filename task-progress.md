@@ -145,3 +145,14 @@
 - Git: 43926fc feat: feature #4 camera-system — ST passed (20/20 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+
+### Session 9 — Feature Design #5 (2026-06-01)
+
+- **Feature #5: Hazards** (FR-009) — 尖刺实体 + 深渊死亡平面
+- **SRS**: §FR-009 (lines 154-163)
+- **Design §2.5**: (lines 196-214)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/5-hazards.md)
+- current.phase: design → tdd
