@@ -96,3 +96,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/3-player-controller.md)
 - current.phase: design → tdd
+
+### Session 6 — TDD #3 (2026-06-01)
+
+- **Feature #3: Player Controller** (FR-001, FR-002, FR-003) — 玩家水平移动/跳跃/冲刺
+- **Status**: failing
+- **Dependencies**: [1, 2]
+- TDD: green ✓ (R-G-R complete) — 32 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+INTG/terrain, negative_ratio=45.2%
+- Quality: line=88.52%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (3/3 FR-001+FR-002+FR-003)
+- current.phase: tdd → st
