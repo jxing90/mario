@@ -105,3 +105,13 @@
 - TDD: green ✓ (R-G-R complete) — 32 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+INTG/terrain, negative_ratio=45.2%
 - Quality: line=88.52%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (3/3 FR-001+FR-002+FR-003)
 - current.phase: tdd → st
+
+### Feature #3: Player Controller — PASS
+- Completed: 2026-06-01
+- TDD: green ✓
+- Quality Gates: 88.52% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 31 cases, all PASS
+- Inline Check: PASS (P2: 7/7 methods, T2: 31/31 tests, D3: OK, ATS Category: 2/2, §4: 6 files 0 violations)
+- Git: b615dc6 feat: feature #3 player-controller — ST passed (31/31 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
