@@ -165,3 +165,13 @@
 - TDD: green ✓ (R-G-R complete) — 14 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+BNDRY/batch+BNDRY/null+INTG/level+INTG/physics, negative_ratio=57.1%
 - Quality: line=88.46%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-009)
 - current.phase: tdd → st
+
+### Feature #5: Hazards — PASS
+- Completed: 2026-06-02
+- TDD: green ✓
+- Quality Gates: 88.46% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 14 cases, all PASS
+- Inline Check: PASS (P2: 5/5 methods, T2: 14/14 tests, D3: N/A, ATS Category: 2/2, §4: 0 files 0 violations)
+- Git: 15866b5 feat: feature #5 hazards — ST passed (14/14 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis

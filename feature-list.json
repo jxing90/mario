@@ -25,7 +25,7 @@
     "ASM-005: 分辨率配置通过游戏内选项菜单切换 —— 已在 FR-017 中覆盖"
   ],
   "required_configs": [],
-  "current": {"feature_id": 5, "phase": "st"},
+  "current": null,
   "features": [
     {
       "id": 1,
@@ -128,7 +128,7 @@
       "title": "Hazards",
       "description": "Spike entities as static danger colliders (16x8 px). Kill-plane at level Y lower bound. On player-spike overlap or player Y > kill_y, emit collision event (HazardContact / PitFall) triggering death flow. Invulnerability exempts damage during 2s window.",
       "priority": "high",
-      "status": "failing",
+      "status": "passing",
       "srs_trace": ["FR-009"],
       "verification_steps": [
         "Given 玩家接触到尖刺或地面陷阱, When 碰撞体与危险区域重叠, Then 玩家立即死亡并触发重生流程 (FR-014b)",
@@ -139,7 +139,10 @@
       "dependencies": [2, 3],
       "ui": false,
       "est_loc": 920,
-      "band": "ok"
+      "band": "ok",
+      "git_sha": "15866b5",
+      "st_case_path": "docs/test-cases/feature-5-hazards.md",
+      "st_case_count": 14
     },
     {
       "id": 6,
