@@ -85,3 +85,14 @@
 - Git: 47840fb feat: feature #2 level-background — ST passed (17/17 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+
+### Session 5 — Feature Design #3 (2026-06-01)
+
+- **Feature #3: Player Controller** (FR-001, FR-002, FR-003) — 玩家水平移动/跳跃/冲刺
+- **SRS**: §FR-001 (lines 99-108), §FR-002 (lines 111-121), §FR-003 (lines 123-131)
+- **Design §2.3**: (lines 143-169)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/3-player-controller.md)
+- current.phase: design → tdd
