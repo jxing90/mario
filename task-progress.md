@@ -175,3 +175,15 @@
 - Git: 15866b5 feat: feature #5 hazards — ST passed (14/14 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+
+### Session 11 — Feature Design #6 (2026-06-02)
+
+- **Feature #6: Life, Death & Win** (FR-014a, FR-014b, FR-014c, FR-015) — 生命/死亡/重生/胜利
+- **SRS**: §FR-014a (line 202), §FR-014b (line 213), §FR-014c (line 225), §FR-015 (line 235)
+- **Design §2.6**: (lines 215-235)
+- **UCD**: §3.13 Game Over Screen (line 166), §3.14 Victory Screen (line 172)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: true (ui_entry=/game-over-overlay, /victory-overlay)
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/6-life-death-win.md)
+- current.phase: design → tdd
