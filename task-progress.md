@@ -156,3 +156,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/5-hazards.md)
 - current.phase: design → tdd
+
+### Session 10 — TDD #5 (2026-06-01)
+
+- **Feature #5: Hazards** (FR-009) — 尖刺实体 + 深渊死亡平面
+- **Status**: failing
+- **Dependencies**: [2, 3]
+- TDD: green ✓ (R-G-R complete) — 14 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+BNDRY/batch+BNDRY/null+INTG/level+INTG/physics, negative_ratio=57.1%
+- Quality: line=88.46%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-009)
+- current.phase: tdd → st

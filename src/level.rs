@@ -1,6 +1,7 @@
 // Feature #2: Level & Background — Level, platforms, bounds, geometry primitives
 // Design Reference: docs/features/2-level-background.md §4, §6, §8
 
+use crate::entities::hazard::Spike;
 use crate::parallax::ParallaxLayer;
 
 // ============================================================================
@@ -74,10 +75,11 @@ pub struct LevelBounds {
 // Level
 // ============================================================================
 
-/// Holds the complete static level data: platforms, bounds, and parallax layers.
+/// Holds the complete static level data: platforms, spikes, bounds, and parallax layers.
 /// Constructed once at game start via `Level::new()` and passed by immutable reference.
 pub struct Level {
     platforms: Vec<Platform>,
+    spikes: Vec<Spike>,
     bounds: LevelBounds,
     parallax_layers: Vec<ParallaxLayer>,
 }
@@ -123,6 +125,14 @@ impl Level {
             },
         ];
 
+        // Hardcoded spike entities along ground level (y=600).
+        // Spike collider (16x8) is centered at pos: bottom edge = pos.y + 4 = 600.
+        let spikes = vec![
+            Spike::new(Vec2 { x: 300.0, y: 596.0 }),
+            Spike::new(Vec2 { x: 700.0, y: 596.0 }),
+            Spike::new(Vec2 { x: 1100.0, y: 596.0 }),
+        ];
+
         let bounds = LevelBounds {
             min_x: 0.0,
             max_x: 2000.0,
@@ -138,6 +148,7 @@ impl Level {
 
         Level {
             platforms,
+            spikes,
             bounds,
             parallax_layers,
         }
@@ -149,15 +160,27 @@ impl Level {
     }
 
     /// Queries terrain tiles that overlap with the given AABB.
-    /// Returns `Vec<Tile>` with `Tile::Platform(aabb)` for each overlapping platform.
-    /// Returns an empty Vec if no platforms overlap.
-    /// Result order matches platform storage order. Does not panic on out-of-bounds AABBs.
+    /// Returns `Vec<Tile>` with `Tile::Platform(aabb)` for each overlapping platform,
+    /// followed by `Tile::Spike(aabb)` for each overlapping spike.
+    /// Returns an empty Vec if nothing overlaps.
+    /// Result order: platforms first, then spikes. Does not panic on out-of-bounds AABBs.
     pub fn query_terrain(&self, aabb: &AABB) -> Vec<Tile> {
-        self.platforms
+        let mut tiles: Vec<Tile> = self
+            .platforms
             .iter()
             .filter(|p| p.aabb.intersects(aabb))
             .map(|p| Tile::Platform(p.aabb))
-            .collect()
+            .collect();
+
+        // Append any overlapping spike tiles.
+        for spike in &self.spikes {
+            let spike_aabb = spike.collider();
+            if spike_aabb.intersects(aabb) {
+                tiles.push(Tile::Spike(spike_aabb));
+            }
+        }
+
+        tiles
     }
 
     /// Returns the level bounds (pure function — always returns the same values).
