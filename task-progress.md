@@ -135,3 +135,13 @@
 - TDD: green ✓ (R-G-R complete) — 21 tests, categories=FUNC/happy=9+FUNC/error=2+BNDRY/edge=6+BNDRY/invalid=1+INTG/player=1+INTG/level=1+INTG/parallax=1, negative_ratio=0.429
 - Quality: line=82.35%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-013)
 - current.phase: tdd → st
+
+### Feature #4: Camera System — PASS
+- Completed: 2026-06-01
+- TDD: green ✓
+- Quality Gates: 82.35% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 20 cases, all PASS
+- Inline Check: PASS (P2: 3/3 methods, T2: 17/17 tests, D3: OK, ATS Category: 2/2, §4: 2 files 0 violations)
+- Git: 43926fc feat: feature #4 camera-system — ST passed (20/20 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis

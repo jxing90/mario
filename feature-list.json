@@ -25,7 +25,7 @@
     "ASM-005: 分辨率配置通过游戏内选项菜单切换 —— 已在 FR-017 中覆盖"
   ],
   "required_configs": [],
-  "current": {"feature_id": 4, "phase": "st"},
+  "current": null,
   "features": [
     {
       "id": 1,
@@ -105,7 +105,7 @@
       "title": "Camera System",
       "description": "Read Player position (IAPI-007), follow horizontally with 8%/frame convergence (player at 35-40% viewport left), vertical dead-zone covering central 60% of viewport (track at 5%/frame only when player exits zone). Clamp to level bounds (IAPI-008). Output camera offset (IAPI-010) for parallax rendering.",
       "priority": "high",
-      "status": "failing",
+      "status": "passing",
       "srs_trace": ["FR-013"],
       "verification_steps": [
         "Given 玩家向右移动, When 玩家 X 坐标增加, Then 摄像机水平位置每帧向目标位置收敛剩余距离的 8%，追赶延迟不超过 80 像素",
@@ -117,7 +117,10 @@
       "dependencies": [3, 2],
       "ui": false,
       "est_loc": 1160,
-      "band": "ok"
+      "band": "ok",
+      "git_sha": "43926fc",
+      "st_case_path": "docs/test-cases/feature-4-camera-system.md",
+      "st_case_count": 20
     },
     {
       "id": 5,
