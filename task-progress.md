@@ -196,3 +196,15 @@
 - TDD: green ✓ (R-G-R complete) — 75 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+UI/render+INTG/player+INTG/physics+INTG/level, negative_ratio=40.8%
 - Quality: line=91.00%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (4/4 FR-014a+FR-014b+FR-014c+FR-015)
 - current.phase: tdd → st
+
+---
+
+### Feature #6: Life, Death & Win — PASS
+- Completed: 2026-06-02
+- TDD: green ✓
+- Quality Gates: 91.00% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 32 cases, all PASS
+- Inline Check: PASS (P2: 21/21 methods, T2: 75/75 tests, D3: OK, ATS Category: 4/4, §4: 0 files 0 violations)
+- Git: d02e761 feat: feature #6 life-death-win — ST passed (32/32 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis

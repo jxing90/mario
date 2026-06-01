@@ -9,6 +9,7 @@
 - Feature #3: Player Controller — horizontal movement (acceleration/friction/reversal), variable-height jump, sprint (1.5x speed), power-up state machine (Small/Super/Fire), IAPI-007/IAPI-009 provider, 31/31 ST cases passing
 - Feature #4: Camera System — horizontal 8%/frame lerp convergence (player at 37.5% viewport left), vertical 60% dead-zone with 5%/frame tracking, level bounds clamping (IAPI-010 provider), 20/20 ST cases passing
 - Feature #5: Hazards — spike entity collision detection (16x8 px), kill-plane pit fall detection, CollisionEvent emission (HazardContact/PitFall) for F06 consumption, 14/14 ST cases passing
+- Feature #6: Life, Death & Win — lives counter (initial 3), checkpoint activation, death animation (1.5s input lock) → respawn at checkpoint (2s invulnerability + 4Hz flicker) or Game Over (lives=0), flagpole trigger → slide animation → Victory screen with coin total + restart prompt, full game reset via Space, 32/32 ST cases passing
 
 ### Changed
 - (none yet)
