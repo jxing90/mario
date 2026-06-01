@@ -187,3 +187,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/6-life-death-win.md)
 - current.phase: design → tdd
+
+### Session 12 — TDD #6 (2026-06-02)
+
+- **Feature #6: Life, Death & Win** (FR-014a, FR-014b, FR-014c, FR-015) — 生命/死亡/重生/胜利
+- **Status**: failing
+- **Dependencies**: [3, 2, 5]
+- TDD: green ✓ (R-G-R complete) — 75 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+UI/render+INTG/player+INTG/physics+INTG/level, negative_ratio=40.8%
+- Quality: line=91.00%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (4/4 FR-014a+FR-014b+FR-014c+FR-015)
+- current.phase: tdd → st

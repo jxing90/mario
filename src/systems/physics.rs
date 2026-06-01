@@ -15,6 +15,8 @@ pub enum CollisionEvent {
     HazardContact,
     /// Player's Y position exceeds the kill-plane threshold (pos.y > kill_y).
     PitFall,
+    /// Player's collider overlaps the flagpole trigger zone.
+    FlagpoleReached,
 }
 
 /// Physics system — collision detection and event emission.
