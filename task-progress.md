@@ -126,3 +126,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/4-camera-system.md)
 - current.phase: design → tdd
+
+### Session 8 — TDD #4 (2026-06-01)
+
+- **Feature #4: Camera System** (FR-013) — 摄像机平滑跟随 + 死区 + 关卡钳制
+- **Status**: failing
+- **Dependencies**: [3, 2]
+- TDD: green ✓ (R-G-R complete) — 21 tests, categories=FUNC/happy=9+FUNC/error=2+BNDRY/edge=6+BNDRY/invalid=1+INTG/player=1+INTG/level=1+INTG/parallax=1, negative_ratio=0.429
+- Quality: line=82.35%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-013)
+- current.phase: tdd → st
