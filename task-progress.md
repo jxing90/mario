@@ -115,3 +115,14 @@
 - Git: b615dc6 feat: feature #3 player-controller — ST passed (31/31 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+
+### Session 7 — Feature Design #4 (2026-06-01)
+
+- **Feature #4: Camera System** (FR-013) — 摄像机平滑跟随 + 死区 + 关卡钳制
+- **SRS**: §FR-013 (lines 190-200)
+- **Design §2.4**: (lines 170-195)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/4-camera-system.md)
+- current.phase: design → tdd
