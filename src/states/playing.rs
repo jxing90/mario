@@ -4,6 +4,7 @@
 // The primary gameplay state. Manages player physics, hazard/flagpole/checkpoint
 // detection, invulnerability timers, and triggers transitions to Dead/Victory.
 
+use crate::entities::enemy::{Enemy, EnemyConfig};
 use crate::entities::player::Player;
 use crate::entities::flagpole::{Flagpole, FlagpolePhase};
 use crate::entities::checkpoint::Checkpoint;
@@ -32,6 +33,7 @@ pub struct PlayingState {
     pub life_state: LifeState,
     pub flagpole: Flagpole,
     pub checkpoints: Vec<Checkpoint>,
+    pub enemies: Vec<Enemy>,
     pub invuln_timer: f32,
     pub flicker_phase: f32,
     level_bounds: LevelBounds,
@@ -51,6 +53,22 @@ impl PlayingState {
             Checkpoint::new(Vec2 { x: 500.0, y: 400.0 }),
         ];
 
+        // Hardcoded patrol enemies placed on the ground (y=584 for 16x16 foot-anchored collider on ground at y=600)
+        let enemies: Vec<Enemy> = vec![
+            Enemy::new(
+                Vec2 { x: 200.0, y: 584.0 },
+                Vec2 { x: 100.0, y: 584.0 },
+                Vec2 { x: 300.0, y: 584.0 },
+                EnemyConfig::default(),
+            ),
+            Enemy::new(
+                Vec2 { x: 800.0, y: 584.0 },
+                Vec2 { x: 700.0, y: 584.0 },
+                Vec2 { x: 900.0, y: 584.0 },
+                EnemyConfig::default(),
+            ),
+        ];
+
         Self {
             player,
             level,
@@ -58,6 +76,7 @@ impl PlayingState {
             life_state,
             flagpole,
             checkpoints,
+            enemies,
             invuln_timer: 0.0,
             flicker_phase: 0.0,
             level_bounds: bounds,
@@ -66,8 +85,8 @@ impl PlayingState {
 
     /// Advance the simulation by one fixed timestep.
     ///
-    /// Runs: invuln countdown → player physics → hazard check → flagpole check
-    /// → checkpoint activation. Transitions to Dead/Victory when triggered.
+    /// Runs: invuln countdown → enemy patrol → player physics → hazard check → enemy check
+    /// → flagpole check → checkpoint activation → event consumption. Transitions to Dead/Victory when triggered.
     pub fn update(&mut self, dt: f32) {
         // 1. Advance invulnerability timer
         if self.invuln_timer > 0.0 {
@@ -84,34 +103,51 @@ impl PlayingState {
             return; // Input locked, no player update during slide
         }
 
-        // 3. Update player physics (normal gameplay)
-        // Note: input is not available here — this is a unit-testable update.
-        // In production, InputState is passed via GameState::update wrapper.
-        // For tests, player movement is verified via direct Player::update calls.
+        // 3. Enemy patrol update (Step A: enemy.update(dt) for each living enemy)
+        for enemy in self.enemies.iter_mut() {
+            enemy.update(dt);
+        }
+
+        // 4. Update player physics (normal gameplay)
         let terrain = self.level.query_terrain(&self.player.collider());
         let no_input = crate::input::InputState::default();
         self.player.update(dt, &no_input, &terrain);
 
-        // 4. Hazard check: if player is NOT invulnerable and hazards exist → death
+        // 5. Hazard check: if player is NOT invulnerable and hazards exist → death
         let kill_y = self.level_bounds.kill_y;
         let events = Physics::hazard_check(&self.player, &terrain, kill_y);
 
-        if !events.is_empty() && self.invuln_timer <= 0.0 {
-            // Decrement lives (death triggered); transition to DeadState is
-            // handled by GameState wrapper reading the signal from this method.
-            if self.player.lives > 0 {
-                self.player.lives -= 1;
+        if !events.is_empty() && self.invuln_timer <= 0.0 && self.player.lives > 0 {
+            self.player.lives -= 1;
+        }
+
+        // 6. Enemy collision detection (Step D: enemy_check)
+        let enemy_events = Physics::enemy_check(&self.player, &self.enemies, dt);
+
+        // 7. Consume enemy collision events (Step E)
+        for event in enemy_events {
+            match event {
+                CollisionEvent::EnemyStomp(i) => {
+                    self.enemies[i].alive = false;
+                    self.player.vel.y = self.enemies[i].config.bounce_velocity;
+                }
+                CollisionEvent::EnemyContact(_)
+                    if self.invuln_timer <= 0.0 && self.player.lives > 0 =>
+                {
+                    self.player.lives -= 1;
+                }
+                _ => {}
             }
         }
 
-        // 5. Flagpole check: if player overlaps flagpole collider → victory slide
+        // 8. Flagpole check: if player overlaps flagpole collider → victory slide
         if self.flagpole.phase == FlagpolePhase::Idle
             && self.player.collider().intersects(&self.flagpole.collider())
         {
             self.flagpole.phase = FlagpolePhase::Sliding;
         }
 
-        // 6. Checkpoint activation: overlap with inactive checkpoint → activate
+        // 9. Checkpoint activation: overlap with inactive checkpoint → activate
         for cp in self.checkpoints.iter_mut() {
             if !cp.activated && self.player.collider().intersects(&cp.collider()) {
                 cp.activated = true;
@@ -119,7 +155,7 @@ impl PlayingState {
             }
         }
 
-        // 7. Sync LifeState coins from player
+        // 10. Sync LifeState coins from player
         self.life_state.coins = self.player.coins;
     }
 

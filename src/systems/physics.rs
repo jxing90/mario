@@ -4,6 +4,7 @@
 // CollisionEvent is a shared enum consumed by F06 (Life/Death), F07 (Patrol Enemy),
 // and F08 (Collectibles). Physics::hazard_check detects spike contact and pit fall.
 
+use crate::entities::enemy::Enemy;
 use crate::entities::player::Player;
 use crate::level::Tile;
 
@@ -17,12 +18,20 @@ pub enum CollisionEvent {
     PitFall,
     /// Player's collider overlaps the flagpole trigger zone.
     FlagpoleReached,
+    /// Player stomped an enemy from above (index into enemies Vec).
+    EnemyStomp(usize),
+    /// Player contacted an enemy from the side or below (index into enemies Vec).
+    EnemyContact(usize),
 }
 
 /// Physics system — collision detection and event emission.
 ///
 /// Unit struct; methods are pure functions acting on borrowed game state.
 pub struct Physics;
+
+/// 2-pixel tolerance for stomp detection: if the player's previous-frame bottom edge
+/// is within 2px above the enemy's top edge, it counts as "was above" (§4 Interface Contract).
+const STOMP_TOLERANCE: f32 = 2.0;
 
 impl Physics {
     /// Detects hazard-related collision events: spike contact and pit fall.
@@ -64,6 +73,67 @@ impl Physics {
         // Phase 2: Check pit fall (strict greater-than comparison)
         if player.pos().y > kill_y {
             events.push(CollisionEvent::PitFall);
+        }
+
+        events
+    }
+
+    /// Detects player-enemy collision events: stomp (from above) vs contact (side/below).
+    ///
+    /// # Parameters (from §4 Interface Contract)
+    /// - `player`: Reference to the player entity for collider, position, and velocity queries.
+    /// - `enemies`: Slice of all living enemies in the current frame.
+    /// - `dt`: Fixed timestep (`1.0/60.0`), used to compute previous-frame player position.
+    ///
+    /// # Returns
+    /// - `Vec<CollisionEvent>` containing `EnemyStomp(i)` or `EnemyContact(i)` for each
+    ///   overlapping pair.
+    /// - Returns empty Vec if no collisions, enemies slice is empty, or enemy is dead.
+    ///
+    /// # Stomp detection (per flowchart TD branch#5)
+    /// A stomp requires BOTH:
+    /// 1. `player.vel.y > 0.0` (strictly downward velocity)
+    /// 2. Player was above the enemy before this step:
+    ///    `prev_player_bottom = player.collider().bottom - vel.y * dt`
+    ///    `prev_player_bottom <= enemy.collider().top + 2.0`
+    ///
+    /// If both conditions are met → `EnemyStomp(i)`. Otherwise → `EnemyContact(i)`.
+    pub fn enemy_check(
+        player: &Player,
+        enemies: &[Enemy],
+        dt: f32,
+    ) -> Vec<CollisionEvent> {
+        let mut events = Vec::new();
+        let player_col = player.collider();
+
+        for (i, enemy) in enemies.iter().enumerate() {
+            // Skip dead enemies (flowchart branch#2: CheckAlive / false → skip)
+            if !enemy.alive {
+                continue;
+            }
+
+            let enemy_col = enemy.collider();
+
+            // Check AABB overlap (flowchart branch#3: CheckIntersect)
+            if !player_col.intersects(&enemy_col) {
+                continue;
+            }
+
+            // Determine stomp vs contact
+            // Condition 1: player must be falling (vel.y > 0 in Y-down coords)
+            // Condition 2: player must have been above enemy before this step
+            let player_bottom = player_col.y + player_col.h;
+            let prev_player_bottom = player_bottom - player.vel.y * dt;
+            let enemy_top = enemy_col.y;
+
+            let is_stomp = player.vel.y > 0.0
+                && prev_player_bottom <= enemy_top + STOMP_TOLERANCE;
+
+            if is_stomp {
+                events.push(CollisionEvent::EnemyStomp(i));
+            } else {
+                events.push(CollisionEvent::EnemyContact(i));
+            }
         }
 
         events

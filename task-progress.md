@@ -251,3 +251,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/7-patrol-enemy.md)
 - current.phase: design → tdd
+
+### Session 16 — TDD #7 (2026-06-03)
+
+- **Feature #7: Patrol Enemy** (FR-010) — 巡逻敌人 + 踩踏判定 + 碰撞方向分派
+- **Status**: failing
+- **Dependencies**: [2, 3, 6]
+- TDD: green ✓ (R-G-R complete) — 17 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+BNDRY/null+INTG/physics+INTG/state, negative_ratio=47.1%
+- Quality: line=92.39%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-010)
+- current.phase: tdd → st
