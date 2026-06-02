@@ -240,3 +240,14 @@
 - Git: c589b2f feat: feature #11 60fps-frame-rate — ST passed (17/17 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+
+### Session 15 — Feature Design #7 (2026-06-03)
+
+- **Feature #7: Patrol Enemy** (FR-010) — 巡逻敌人 + 踩踏判定 + 碰撞方向分派
+- **SRS**: §FR-010 (line 165-175)
+- **Design**: §2.7 (lines 237-255)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/7-patrol-enemy.md)
+- current.phase: design → tdd
