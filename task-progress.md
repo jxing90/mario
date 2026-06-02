@@ -208,3 +208,14 @@
 - Git: d02e761 feat: feature #6 life-death-win — ST passed (32/32 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+
+### Session 13 — Feature Design #11 (2026-06-02)
+
+- **Feature #11: 60fps Frame Rate (NFR-001)** — 性能度量仪表 + FPS 计数器
+- **SRS**: NFR-001 (§5 非功能需求表，行 362)
+- **Design**: §1.5 NFR 对齐摘要 (行 92-94)；无独立 §2.11（首个 NFR 特性）
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/11-60fps-frame-rate-nfr-001.md)
+- current.phase: design → tdd
