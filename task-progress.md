@@ -228,3 +228,15 @@
 - TDD: green ✓ (R-G-R complete) — 17 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+PERF, negative_ratio=0.471
 - Quality: line=92.10%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 NFR-001)
 - current.phase: tdd → st
+
+---
+
+### Feature #11: 60fps Frame Rate (NFR-001) — PASS
+- Completed: 2026-06-02
+- TDD: green ✓
+- Quality Gates: 92.10% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 17 cases, all PASS
+- Inline Check: PASS (P2: 7/7 methods, T2: 17/17 tests, D3: OK, ATS Category: 3/3, §4: 3 files 0 violations)
+- Git: c589b2f feat: feature #11 60fps-frame-rate — ST passed (17/17 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis

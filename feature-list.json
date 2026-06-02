@@ -25,7 +25,7 @@
     "ASM-005: 分辨率配置通过游戏内选项菜单切换 —— 已在 FR-017 中覆盖"
   ],
   "required_configs": [],
-  "current": {"feature_id": 11, "phase": "st"},
+  "current": null,
   "features": [
     {
       "id": 1,
@@ -265,7 +265,7 @@
       "title": "60fps Frame Rate (NFR-001)",
       "description": "The game shall render at a stable 60 frames per second at target resolution. 99% of frame render times ≤ 16.67ms; any continuous 60-second window shall maintain ≥ 58fps. Built-in FPS counter logs min/max/avg/p99 frame times.",
       "priority": "high",
-      "status": "failing",
+      "status": "passing",
       "srs_trace": ["NFR-001"],
       "verification_steps": [
         "P99 帧时间 ≤ 16.67ms at 720p/1080p/1440p 窗口模式",
@@ -275,7 +275,10 @@
       "dependencies": [1],
       "ui": false,
       "est_loc": 0,
-      "band": "small"
+      "band": "small",
+      "git_sha": "c589b2f",
+      "st_case_path": "docs/test-cases/feature-11-60fps-frame-rate-nfr-001.md",
+      "st_case_count": 17
     },
     {
       "id": 12,

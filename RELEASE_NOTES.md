@@ -11,6 +11,8 @@
 - Feature #5: Hazards — spike entity collision detection (16x8 px), kill-plane pit fall detection, CollisionEvent emission (HazardContact/PitFall) for F06 consumption, 14/14 ST cases passing
 - Feature #6: Life, Death & Win — lives counter (initial 3), checkpoint activation, death animation (1.5s input lock) → respawn at checkpoint (2s invulnerability + 4Hz flicker) or Game Over (lives=0), flagpole trigger → slide animation → Victory screen with coin total + restart prompt, full game reset via Space, 32/32 ST cases passing
 
+- Feature #11: 60fps Frame Rate (NFR-001) — built-in FPS counter with min/max/avg/p99 frame-time statistics and 60-second sliding window FPS validation, 17/17 ST cases passing
+
 ### Changed
 - (none yet)
 
