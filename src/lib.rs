@@ -11,6 +11,7 @@ pub mod assets;
 pub mod level;
 pub mod parallax;
 
+pub mod metrics;
 pub mod states;
 pub mod entities;
 pub mod systems;

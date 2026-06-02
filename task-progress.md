@@ -219,3 +219,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/11-60fps-frame-rate-nfr-001.md)
 - current.phase: design → tdd
+
+### Session 14 — TDD #11 (2026-06-02)
+
+- **Feature #11: 60fps Frame Rate (NFR-001)** — 性能度量仪表 + FPS 计数器
+- **Status**: failing
+- **Dependencies**: [1]
+- TDD: green ✓ (R-G-R complete) — 17 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+PERF, negative_ratio=0.471
+- Quality: line=92.10%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 NFR-001)
+- current.phase: tdd → st

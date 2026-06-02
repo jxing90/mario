@@ -7,6 +7,7 @@
 // IAPI-011 Provider: GameLoop::apply_display(w, h, fullscreen) responds to
 // Display Config (Feature #10) resolution/fullscreen change requests.
 
+use crate::metrics::FrameMetrics;
 use crate::state::StateMachine;
 
 // ============================================================================
@@ -89,6 +90,7 @@ pub struct GameLoop {
     pub dt: f32,
     pub max_steps: u32,
     pub window: GameWindow,
+    pub metrics: FrameMetrics,
 }
 
 impl GameLoop {
@@ -113,6 +115,7 @@ impl GameLoop {
             dt: DT,
             max_steps: MAX_STEPS,
             window,
+            metrics: FrameMetrics::new(),
         })
     }
 
@@ -131,6 +134,9 @@ impl GameLoop {
     /// 4. `alpha = accumulator / dt`
     /// 5. `state.render(alpha)`
     pub fn tick<S: StateMachine + ?Sized>(&mut self, frame_time: f32, state: &mut S) {
+        // Step 0: Record frame time for performance metrics (Feature #11, NFR-001).
+        self.metrics.sample(frame_time);
+
         // Step 1: Accumulate real elapsed time.
         self.accumulator += frame_time;
 
@@ -153,6 +159,13 @@ impl GameLoop {
         // Step 4–5: Compute interpolation alpha and render.
         let alpha = self.accumulator / self.dt;
         state.render(alpha);
+
+        // Step 6: Auto-log FPS report every 60 seconds (≈3600 frames @ 60fps).
+        // Feature #11: NFR-001 — sliding window performance validation.
+        let fc = self.metrics.frame_count;
+        if fc > 0 && fc.is_multiple_of(3600) {
+            self.metrics.log_report();
+        }
     }
 
     /// Apply display configuration changes (IAPI-011).
