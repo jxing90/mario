@@ -374,4 +374,16 @@
 - Git: e415c6c feat: feature #10 display-config — ST passed (31/31 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+### Session 23 — Feature Design #12 (2026-06-03)
+
+- **Feature #12: Multi-Resolution Display (NFR-002)** — 多分辨率校验工具 + 自动化测量断言
+- **SRS**: NFR-002 (§5 非功能需求表，行 363)
+- **Design**: §1.5 NFR 对齐摘要 (行 93)；无独立 §2.12
+- **ATS**: NFR-002 → PERF,UI; Manual: visual-judgment; F01/F04/F09/F10
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/12-multi-resolution-display-nfr-002.md)
+- current.phase: design → tdd
+
 - ⚠ [Manual] 2 manual test cases require visual verification: ST-UI-010-M01 (visual rendering completeness — 8 VRC elements, pixel-font clarity, semi-transparency effect) and ST-UI-010-M02 (interactive depth — real-time highlight sync, fullscreen toggle behavior, nearest-neighbor scaling confirmation) — per ATS FR-017 Manual: visual-judgment requirement
