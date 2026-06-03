@@ -410,3 +410,15 @@
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
 - ⚠ [Manual] 3 manual test cases require visual verification: ST-UI-012-015 (HUD anchor screenshot at 720p/1080p/1440p), ST-UI-012-016 (player visible area ratio 45-50% screenshot), ST-UI-012-017 (fullscreen HUD position consistency screenshot) — per ATS NFR-002 Manual: visual-judgment requirement
 - ⚠ [Design] player_target_x_pct = 0.375 produces visible ratio ~62.5%, exceeding SRS 45-50% target — documented in Feature Design Clarification Addendum #1 as known assumption; adjust CameraConfig::player_target_x_pct to 0.50-0.55 if constraint enforcement needed
+
+### Session 25 — Feature Design #13 (2026-06-03)
+
+- **Feature #13: Pixel Art Rendering (NFR-003)** — 最近邻插值 + 像素坐标取整 + 调色板 ≤ 16 色
+- **SRS**: NFR-003 (§5 非功能需求表，行 364)
+- **Design**: §1.5 NFR 对齐摘要 (行 94)；无独立 §2.13
+- **ATS**: NFR-003 → UI; Manual: visual-judgment; F02 依赖
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/13-pixel-art-rendering-nfr-003.md)
+- current.phase: design → tdd
