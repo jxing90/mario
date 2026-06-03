@@ -29,8 +29,11 @@ pub struct PlayerConfig {
     pub sprint_multiplier: f32,
     /// Fraction of ground acceleration available while airborne. Default: 0.6.
     pub air_control_factor: f32,
-    /// Downward acceleration due to gravity (px/s^2). Default: 1200.0.
+    /// Downward acceleration due to gravity (px/s^2). Default: 900.0.
     pub gravity: f32,
+    /// Maximum downward speed (px/s). Prevents tunneling through thin platforms.
+    /// Default: 600.0.
+    pub max_fall_speed: f32,
 }
 
 impl Default for PlayerConfig {
@@ -43,7 +46,8 @@ impl Default for PlayerConfig {
             max_jump_duration: 0.35,       // hold window for variable-height jump
             sprint_multiplier: 1.5,
             air_control_factor: 0.6,
-            gravity: 900.0, // lighter gravity for better platforming feel
+            gravity: 900.0,
+            max_fall_speed: 600.0,
         }
     }
 }
@@ -311,8 +315,11 @@ impl Player {
     // apply_gravity — free-fall acceleration when airborne
     // ------------------------------------------------------------------
     fn apply_gravity(&mut self, dt: f32) {
-        // Gravity always applies — collision resolution handles ground support
         self.vel.y += self.config.gravity * dt;
+        // Cap fall speed to prevent tunneling through thin platforms
+        if self.vel.y > self.config.max_fall_speed {
+            self.vel.y = self.config.max_fall_speed;
+        }
     }
 
     // ------------------------------------------------------------------

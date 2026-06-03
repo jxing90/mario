@@ -61,6 +61,8 @@ struct JsonLevel {
     #[serde(default)]
     question_blocks: Vec<JsonPos>,
     #[serde(default)]
+    bricks: Vec<JsonPos>,
+    #[serde(default)]
     enemies: Vec<JsonEnemy>,
     #[serde(default)]
     checkpoints: Vec<JsonPos>,
@@ -94,6 +96,9 @@ pub struct CoinSpawn { pub pos: Vec2 }
 pub struct QuestionBlockSpawn { pub pos: Vec2 }
 
 #[derive(Debug, Clone)]
+pub struct BrickSpawn { pub pos: Vec2 }
+
+#[derive(Debug, Clone)]
 pub struct EnemySpawn { pub pos: Vec2, pub waypoint_a: Vec2, pub waypoint_b: Vec2 }
 
 #[derive(Debug, Clone)]
@@ -114,6 +119,7 @@ pub struct Level {
     parallax_layers: Vec<ParallaxLayer>,
     pub coin_spawns: Vec<CoinSpawn>,
     pub block_spawns: Vec<QuestionBlockSpawn>,
+    pub brick_spawns: Vec<BrickSpawn>,
     pub enemy_spawns: Vec<EnemySpawn>,
     pub checkpoint_spawns: Vec<CheckpointSpawn>,
     pub flagpole_spawn: FlagpoleSpawn,
@@ -162,6 +168,9 @@ impl Level {
         let block_spawns: Vec<QuestionBlockSpawn> = data.question_blocks.iter()
             .map(|b| QuestionBlockSpawn { pos: Vec2 { x: b.x, y: b.y } }).collect();
 
+        let brick_spawns: Vec<BrickSpawn> = data.bricks.iter()
+            .map(|b| BrickSpawn { pos: Vec2 { x: b.x, y: b.y } }).collect();
+
         let enemy_spawns: Vec<EnemySpawn> = data.enemies.iter().map(|e| EnemySpawn {
             pos: Vec2 { x: e.x, y: e.y },
             waypoint_a: Vec2 { x: e.waypoint_a.x, y: e.waypoint_a.y },
@@ -176,7 +185,7 @@ impl Level {
         };
 
         Level { platforms, spikes, bounds, parallax_layers,
-            coin_spawns, block_spawns, enemy_spawns, checkpoint_spawns, flagpole_spawn }
+            coin_spawns, block_spawns, brick_spawns, enemy_spawns, checkpoint_spawns, flagpole_spawn }
     }
 
     pub fn platforms(&self) -> &[Platform] { &self.platforms }

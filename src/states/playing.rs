@@ -10,7 +10,7 @@ use crate::entities::player::Player;
 use crate::entities::flagpole::{Flagpole, FlagpolePhase};
 use crate::entities::checkpoint::Checkpoint;
 use crate::entities::question_block::QuestionBlock;
-use crate::level::{Level, LevelBounds, Vec2};
+use crate::level::{BrickSpawn, Level, LevelBounds, Vec2};
 use crate::systems::camera::Camera;
 use crate::systems::camera::CameraConfig;
 use crate::systems::hud::HudRenderer;
@@ -39,6 +39,11 @@ pub struct PlayingState {
     pub enemies: Vec<Enemy>,
     pub coins: Vec<Coin>,
     pub question_blocks: Vec<QuestionBlock>,
+    /// Breakable bricks: when hit from below by Super/Fire Mario, they shatter.
+    pub bricks: Vec<Brick>,
+    /// Spawn positions for brick reset on death (bricks are restored).
+    #[allow(dead_code)]
+    brick_spawns: Vec<BrickSpawn>,
     pub invuln_timer: f32,
     pub flicker_phase: f32,
     /// Countdown timer in seconds (classic Mario: 300s per level).
@@ -91,6 +96,12 @@ impl PlayingState {
             .map(|b| QuestionBlock::new(Vec2 { x: b.pos.x, y: b.pos.y }))
             .collect();
 
+        // Spawn breakable bricks from level config
+        let brick_spawns: Vec<BrickSpawn> = level.brick_spawns.clone();
+        let bricks: Vec<Brick> = brick_spawns.iter()
+            .map(|b| Brick { pos: Vec2 { x: b.pos.x, y: b.pos.y }, broken: false })
+            .collect();
+
         // Spawn enemies from level config
         let enemies: Vec<Enemy> = level.enemy_spawns.iter()
             .map(|e| Enemy::new(
@@ -111,6 +122,8 @@ impl PlayingState {
             enemies,
             coins,
             question_blocks,
+            bricks,
+            brick_spawns,
             invuln_timer: 0.0,
             flicker_phase: 0.0,
             time_remaining: 300.0,
@@ -175,8 +188,13 @@ impl PlayingState {
         let mut terrain = self.level.query_terrain(&self.player.collider());
         // Question blocks act as solid platforms (used or not)
         for block in &self.question_blocks {
-            let ba = block.collider();
-            terrain.push(crate::level::Tile::Platform(ba));
+            terrain.push(crate::level::Tile::Platform(block.collider()));
+        }
+        // Bricks are solid platforms too (unless broken)
+        for brick in &self.bricks {
+            if !brick.broken {
+                terrain.push(crate::level::Tile::Platform(brick.collider()));
+            }
         }
         let input = if self.screen_w > 0.0 {
             self.read_input()
@@ -193,7 +211,22 @@ impl PlayingState {
             }
         }
 
-        // 4c. Question block hit: player head hits block from below
+        // 4c. Breakable brick hit: Super/Fire Mario breaks bricks from below
+        if !matches!(self.player.state, crate::entities::player::PlayerState::Small) {
+            for brick in self.bricks.iter_mut() {
+                if brick.broken { continue; }
+                let ba = brick.collider();
+                let pa = self.player.collider();
+                if pa.intersects(&ba) && self.player.vel.y < 0.0
+                    && (pa.y + pa.h) > ba.y && pa.y < ba.y + ba.h
+                {
+                    brick.broken = true;
+                    self.player.vel.y = 100.0; // bounce down
+                }
+            }
+        }
+
+        // 4d. Question block hit: player head hits block from below
         for block in self.question_blocks.iter_mut() {
             if !block.used {
                 let block_aabb = block.collider();
@@ -458,6 +491,19 @@ impl PlayingState {
             }
         }
 
+        // ── 5b. Breakable bricks (brown, or gone if broken) ──
+        let brick_color = macroquad::color::Color::new(0.65, 0.40, 0.20, 1.0);
+        for brick in &self.bricks {
+            if !brick.broken {
+                let (sbx, sby) = ws(brick.pos.x, brick.pos.y);
+                draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, brick_color);
+                // Brick lines
+                let line_color = macroquad::color::Color::new(0.35, 0.20, 0.10, 1.0);
+                draw_rectangle(sbx, sby + 15.0 * sy, 32.0 * sx, 2.0 * sy, line_color);
+                draw_rectangle(sbx + 15.0 * sx, sby, 2.0 * sx, 15.0 * sy, line_color);
+            }
+        }
+
         // ── 6. Checkpoints ──
         let cp_color = macroquad::color::Color::new(0.2, 0.8, 0.2, 1.0);
         for cp in &self.checkpoints {
@@ -572,5 +618,19 @@ impl PlayingState {
             font_size,
             time_color,
         );
+    }
+}
+
+/// Breakable brick entity. Solid platform; shatters when Super/Fire Mario
+/// hits it from below. Small Mario just bounces off.
+#[derive(Debug, Clone)]
+pub struct Brick {
+    pub pos: Vec2,
+    pub broken: bool,
+}
+
+impl Brick {
+    pub fn collider(&self) -> crate::level::AABB {
+        crate::level::AABB { x: self.pos.x, y: self.pos.y, w: 32.0, h: 32.0 }
     }
 }
