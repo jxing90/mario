@@ -6,14 +6,15 @@ use crate::states::{GameState, LifeState, PlayingState};
 
 pub struct GameOverState {
     pub coins: u32,
+    pub level: u32,
     pub blink_phase: f32,
     pub screen_w: f32,
     pub screen_h: f32,
 }
 
 impl GameOverState {
-    pub fn new(coins: u32) -> Self {
-        Self { coins, blink_phase: 0.0, screen_w: 0.0, screen_h: 0.0 }
+    pub fn new(coins: u32, level: u32) -> Self {
+        Self { coins, level, blink_phase: 0.0, screen_w: 0.0, screen_h: 0.0 }
     }
 
     pub fn update(&mut self, dt: f32) -> Option<GameState> {

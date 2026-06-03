@@ -259,7 +259,7 @@ impl PlayingState {
 
         // 12. Check Game Over: lives exhausted
         if self.player.lives == 0 {
-            return Some(GameState::GameOver(GameOverState::new(self.player.coins)));
+            return Some(GameState::GameOver(GameOverState::new(self.player.coins, self.current_level)));
         }
 
         None // Continue playing

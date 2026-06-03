@@ -2785,7 +2785,7 @@ fn t64_cov_playing_state_activate_checkpoint() {
 
 #[test]
 fn t65_cov_game_over_state_new_and_update() {
-    let mut go = GameOverState::new(42);
+    let mut go = GameOverState::new(42, 0);
     assert_eq!(go.coins, 42);
     assert!(approx_eq(go.blink_phase, 0.0));
 
@@ -2805,7 +2805,7 @@ fn t65_cov_game_over_state_new_and_update() {
 
 #[test]
 fn t66_cov_victory_state_new_and_update() {
-    let mut vs = VictoryState::new(99);
+    let mut vs = VictoryState::new(99, 0);
     assert_eq!(vs.coins, 99);
     assert!(approx_eq(vs.blink_phase, 0.0));
 
@@ -2890,7 +2890,7 @@ fn t68_cov_game_state_update_dead() {
 
 #[test]
 fn t69_cov_game_state_update_game_over() {
-    let gos = GameOverState::new(10);
+    let gos = GameOverState::new(10, 0);
     let mut gs = GameState::GameOver(gos);
 
     gs.update(DT);
@@ -2909,7 +2909,7 @@ fn t69_cov_game_state_update_game_over() {
 
 #[test]
 fn t70_cov_game_state_update_victory() {
-    let vs = VictoryState::new(99);
+    let vs = VictoryState::new(99, 0);
     let mut gs = GameState::Victory(vs);
 
     gs.update(DT);
@@ -2975,10 +2975,10 @@ fn t73_cov_game_state_render_dispatch() {
     let mut gs_dead = GameState::Dead(DeadState::new(2, 0, None, pos));
     gs_dead.render(0.0);
 
-    let mut gs_go = GameState::GameOver(GameOverState::new(10));
+    let mut gs_go = GameState::GameOver(GameOverState::new(10, 0));
     gs_go.render(0.0);
 
-    let mut gs_victory = GameState::Victory(VictoryState::new(99));
+    let mut gs_victory = GameState::Victory(VictoryState::new(99, 0));
     gs_victory.render(0.0);
 
     let mut gs_paused = GameState::Paused;

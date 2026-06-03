@@ -97,7 +97,7 @@ impl DeadState {
                 Some(GameState::Playing(Box::new(playing)))
             } else {
                 // Game Over
-                let game_over = GameOverState::new(self.coins);
+                let game_over = GameOverState::new(self.coins, 1);
                 Some(GameState::GameOver(game_over))
             }
         } else {
