@@ -292,3 +292,16 @@
 - TDD: green ✓ (R-G-R complete) — 39 tests, categories=FUNC/happy(16)+FUNC/error(7)+BNDRY/edge(11)+INTG/physics(3)+INTG/state(1)+PERF/probability(1), negative_ratio=0.462
 - Quality: line=89.14%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (2/2 FR-008+FR-011)
 - current.phase: tdd → st
+
+---
+
+### Feature #8: Collectibles & Blocks — PASS
+- Completed: 2026-06-03
+- TDD: green ✓
+- Quality Gates: 89.14% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 39 cases, all PASS
+- Inline Check: PASS (P2: 17/20 methods + 3 benign deviations, T2: 39/39 tests, D3: OK, ATS Category: 3/3, §4: 10 files 0 violations)
+- Git: a8c6fab feat: feature #8 collectibles-blocks — ST passed (39/39 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+- ⚠ [Design] P2 3 benign deviations: LootTable::roll → roll_with_value, PlayingState::shoot_fireball/reset_collectibles integrated into update/LifeState

@@ -25,7 +25,7 @@
     "ASM-005: 分辨率配置通过游戏内选项菜单切换 —— 已在 FR-017 中覆盖"
   ],
   "required_configs": [],
-  "current": {"feature_id": 8, "phase": "st"},
+  "current": null,
   "features": [
     {
       "id": 1,
@@ -203,7 +203,7 @@
       "title": "Collectibles & Blocks",
       "description": "Coins placed in level: collected on player collision → deactivate + coin counter +1; reset on player death & respawn. Question blocks: hit from below by player head → deactivate (show 'used' state), roll loot table (Coin 70% / Super Mushroom 15% / Fire Flower 15%), spawn reward above block. Super Mushroom bounces along ground, Fire Flower stays static at spawn position.",
       "priority": "medium",
-      "status": "failing",
+      "status": "passing",
       "srs_trace": ["FR-008", "FR-011"],
       "verification_steps": [
         "Given 玩家移动到金币所在位置, When 玩家碰撞体与金币碰撞体重叠, Then 金币从场景中移除且 HUD 金币计数 +1",
@@ -218,7 +218,10 @@
       "dependencies": [2, 3],
       "ui": false,
       "est_loc": 2040,
-      "band": "large"
+      "band": "large",
+      "git_sha": "a8c6fab",
+      "st_case_path": "docs/test-cases/feature-8-collectibles-blocks.md",
+      "st_case_count": 39
     },
     {
       "id": 9,
