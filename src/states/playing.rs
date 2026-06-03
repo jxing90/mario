@@ -405,15 +405,19 @@ impl PlayingState {
         // Ground base
         draw_rectangle(fpx - 8.0 * sx, fpy, pole_w + 16.0 * sx, 8.0 * sy, macroquad::color::DARKGRAY);
 
-        // ── 8. Enemies ──
+        // ── 8. Enemies (drawn from foot upward, same as player) ──
         for enemy in &self.enemies {
             if enemy.alive {
                 let ep = enemy.pos();
-                let (sex, sey) = ws(ep.x, ep.y);
+                // Enemy collider bottom is at pos.y; draw from foot going up 16px
+                let (sex, sey) = ws(ep.x, ep.y - 16.0);
                 draw_rectangle(sex, sey, 16.0 * sx, 16.0 * sy, macroquad::color::BROWN);
-                // Eyes
-                draw_circle(sex + 4.0 * sx, sey + 4.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
-                draw_circle(sex + 12.0 * sx, sey + 4.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+                // Eyes in upper portion
+                draw_circle(sex + 4.0 * sx, sey + 3.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+                draw_circle(sex + 12.0 * sx, sey + 3.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+                // Feet
+                draw_rectangle(sex + 2.0 * sx, sey + 12.0 * sy, 5.0 * sx, 4.0 * sy, macroquad::color::BLACK);
+                draw_rectangle(sex + 9.0 * sx, sey + 12.0 * sy, 5.0 * sx, 4.0 * sy, macroquad::color::BLACK);
             }
         }
 
