@@ -244,6 +244,13 @@ impl PlayingState {
         // 11. Update camera to follow player (IAPI-007 + IAPI-008)
         self.camera.update(self.player.pos(), self.level_bounds, dt);
 
+        // 11b. Clamp player to level bounds (invisible walls at left/right edges)
+        let bw = self.player.collider().w;
+        self.player.pos.x = self.player.pos.x.clamp(
+            self.level_bounds.min_x,
+            self.level_bounds.max_x - bw,
+        );
+
         // 12. Check Game Over: lives exhausted
         if self.player.lives == 0 {
             return Some(GameState::GameOver(GameOverState::new(self.player.coins)));
@@ -368,6 +375,20 @@ impl PlayingState {
         {
             let (px, py) = ws(1000.0, 320.0);
             draw_rectangle(px, py, 250.0 * sx, 30.0 * sy, plat_color);
+        }
+
+        // Boundary walls (invisible collision + visual markers at level edges)
+        let bounds = self.level.bounds();
+        let wall_color = macroquad::color::Color::new(0.5, 0.5, 0.5, 0.6);
+        // Left wall
+        {
+            let (wx, wy) = ws(bounds.min_x - 4.0, 0.0);
+            draw_rectangle(wx, wy, 4.0 * sx, (bounds.kill_y - 0.0) * sy, wall_color);
+        }
+        // Right wall
+        {
+            let (wx, wy) = ws(bounds.max_x, 0.0);
+            draw_rectangle(wx, wy, 4.0 * sx, (bounds.kill_y - 0.0) * sy, wall_color);
         }
 
         // ── 3. Spikes ──
