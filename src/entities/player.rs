@@ -39,11 +39,11 @@ impl Default for PlayerConfig {
             acceleration: 200.0 / 0.3, // ≈ 666.67 → reach max_speed in 0.3s
             max_speed: 200.0,
             friction: 200.0 / 0.2, // 1000.0 → stop from max_speed in 0.2s
-            jump_initial_velocity: -300.0,
-            max_jump_duration: 0.35,
+            jump_initial_velocity: -350.0, // strong initial impulse (~62px short tap)
+            max_jump_duration: 0.35,       // hold window for variable-height jump
             sprint_multiplier: 1.5,
             air_control_factor: 0.6,
-            gravity: 1200.0,
+            gravity: 980.0, // natural-feeling gravity
         }
     }
 }
@@ -292,13 +292,12 @@ impl Player {
             self.on_ground = false;
         }
 
-        // Jump sustain: hold Space within max_jump_duration
+        // Jump sustain: hold Space within max_jump_duration.
+        // Counteracts a fraction of gravity so holding gives noticeably more height.
         if self.jump_held && input.jump && self.jump_timer < self.config.max_jump_duration {
-            // Sustain force counteracts gravity to maintain upward velocity
-            let sustain = self.config.jump_initial_velocity.abs() / self.config.max_jump_duration;
+            let sustain = self.config.gravity * 0.72;
             self.vel.y -= sustain * dt; // push upward (more negative Y)
             self.jump_timer += dt;
-            // Cut-off: if timer exceeded max after this frame, stop sustain
             if self.jump_timer >= self.config.max_jump_duration {
                 self.jump_held = false;
             }

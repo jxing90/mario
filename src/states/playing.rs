@@ -319,11 +319,25 @@ impl PlayingState {
             draw_rectangle(cpx, cpy - cp_h * sy, 8.0 * sx, cp_h * sy, cp_color);
         }
 
-        // ── 7. Flagpole ──
+        // ── 7. Flagpole (prominent goal marker) ──
         let fp = self.flagpole.pos;
         let (fpx, fpy) = ws(fp.x, fp.y);
-        draw_rectangle(fpx, fpy - 80.0 * sy, 8.0 * sx, 80.0 * sy, macroquad::color::GRAY);
-        draw_rectangle(fpx - 4.0 * sx, fpy - 80.0 * sy, 16.0 * sx, 16.0 * sy, macroquad::color::GREEN);
+        let pole_w = 6.0 * sx;
+        let pole_h = 120.0 * sy;
+        // Pole shadow
+        draw_rectangle(fpx + 2.0 * sx, fpy - pole_h + 2.0 * sy, pole_w, pole_h, macroquad::color::DARKGRAY);
+        // Main pole
+        draw_rectangle(fpx, fpy - pole_h, pole_w, pole_h, macroquad::color::GRAY);
+        // Green flag (triangular-ish)
+        let flag_w = 24.0 * sx;
+        let flag_h = 18.0 * sy;
+        draw_rectangle(fpx + pole_w, fpy - pole_h, flag_w, flag_h, macroquad::color::GREEN);
+        // Star on flag
+        draw_text("*", fpx + pole_w + 6.0 * sx, fpy - pole_h + 14.0 * sy, 16.0 * sx.min(sy), macroquad::color::YELLOW);
+        // "GOAL" label
+        draw_text("GOAL", fpx - 8.0 * sx, fpy - pole_h - 20.0 * sy, 20.0 * sx.min(sy), macroquad::color::GOLD);
+        // Ground base
+        draw_rectangle(fpx - 8.0 * sx, fpy, pole_w + 16.0 * sx, 8.0 * sy, macroquad::color::DARKGRAY);
 
         // ── 8. Enemies ──
         for enemy in &self.enemies {
