@@ -353,3 +353,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/10-display-config.md)
 - current.phase: design → tdd
+
+### Session 22 — TDD #10 (2026-06-03)
+
+- **Feature #10: Display Config** (FR-017) — 分辨率切换 + 全屏开关 + 选项菜单 UI
+- **Status**: failing
+- **Dependencies**: [1]
+- TDD: green ✓ (R-G-R complete) — 31 tests, categories=FUNC/happy(8)+FUNC/error(4)+BNDRY/edge(9)+INTG/api(2)+UI/render(8), negative_ratio=0.419
+- Quality: line=85.46%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-017)
+- current.phase: tdd → st
