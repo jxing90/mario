@@ -284,6 +284,19 @@
 - Design: DONE (docs/features/8-collectibles-blocks.md)
 - current.phase: design → tdd
 
+### Session 19 — Feature Design #9 (2026-06-03)
+
+- **Feature #9: HUD** (FR-016) — 金币/生命 HUD 叠加层渲染
+- **SRS**: §FR-016 (lines 247-256)
+- **Design**: §2.9 (lines 277-293)
+- **UCD**: §3.11 HUD Elements (lines 154-158)
+- **ATS**: FR-016 mapped to FUNC,BNDRY,UI; INT-005 (coin→HUD), INT-006 (death→lives)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: true (ui_entry=/game-hud)
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/9-hud.md)
+- current.phase: design → tdd
+
 ### Session 18 — TDD #8 (2026-06-03)
 
 - **Feature #8: Collectibles & Blocks** (FR-008, FR-011) — 金币收集 + 问号方块 + 奖励道具
