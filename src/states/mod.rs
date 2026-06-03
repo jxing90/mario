@@ -95,23 +95,31 @@ impl GameState {
 
 impl StateMachine for GameState {
     fn update(&mut self, dt: f32) {
-        // Take ownership of self temporarily to allow transition
+        // Preserve screen dimensions across state transitions
+        let (sw, sh) = match self {
+            GameState::Playing(s) => (s.screen_w, s.screen_h),
+            GameState::Victory(s) => (s.screen_w, s.screen_h),
+            GameState::GameOver(s) => (s.screen_w, s.screen_h),
+            _ => (0.0, 0.0),
+        };
+
         let transition = match self {
-            GameState::Playing(state) => {
-                state.update(dt);
-                None
-            }
+            GameState::Playing(state) => state.update(dt),
             GameState::Dead(state) => state.update(dt),
             GameState::GameOver(state) => state.update(dt),
             GameState::Victory(state) => state.update(dt),
-            GameState::Paused | GameState::OptionsMenu => {
-                // Placeholder — no-op for now
-                None
-            }
+            GameState::Paused | GameState::OptionsMenu => None,
         };
 
         if let Some(next) = transition {
             *self = next;
+            // Inject screen dimensions into new state
+            match self {
+                GameState::Playing(s) => { s.screen_w = sw; s.screen_h = sh; }
+                GameState::Victory(s) => { s.screen_w = sw; s.screen_h = sh; }
+                GameState::GameOver(s) => { s.screen_w = sw; s.screen_h = sh; }
+                _ => {}
+            }
         }
     }
 
@@ -121,9 +129,7 @@ impl StateMachine for GameState {
             GameState::Dead(state) => state.render(alpha),
             GameState::GameOver(state) => state.render(alpha),
             GameState::Victory(state) => state.render(alpha),
-            GameState::Paused | GameState::OptionsMenu => {
-                // Placeholder — no-op for now
-            }
+            GameState::Paused | GameState::OptionsMenu => {}
         }
     }
 }

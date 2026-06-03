@@ -1,61 +1,51 @@
 // Feature #6: Life, Death & Win — VictoryState
 // Design Reference: docs/features/6-life-death-win.md §4, §8
-//
-// Displays the Victory screen when the flagpole slide animation completes.
-// Renders a 65% black overlay with "VICTORY!" title (gold #F8B800),
-// coin count (3-digit zero-padded), and blinking "Press Space to Play Again".
-// Space triggers a full game reset → Playing.
 
-use crate::states::GameState;
+use crate::entities::player::{Player, PlayerConfig};
+use crate::states::{GameState, LifeState, PlayingState};
 
-/// Victory screen: displayed after flagpole slide animation completes.
-///
-/// # Fields (§8 Data Model)
-/// - `coins`: total coins collected in this run.
-/// - `blink_phase`: oscillating timer for the play-again prompt blink (2Hz).
 pub struct VictoryState {
     pub coins: u32,
     pub blink_phase: f32,
+    pub screen_w: f32,
+    pub screen_h: f32,
 }
 
 impl VictoryState {
-    /// Creates a new VictoryState with the final coin count.
-    ///
-    /// # Postconditions (§4)
-    /// - `blink_phase = 0.0`
-    /// - Waits for Space input to trigger reset.
     pub fn new(coins: u32) -> Self {
-        Self {
-            coins,
-            blink_phase: 0.0,
-        }
+        Self { coins, blink_phase: 0.0, screen_w: 0.0, screen_h: 0.0 }
     }
 
-    /// Advances the Victory state by one fixed timestep.
-    ///
-    /// Updates `blink_phase` for the 2Hz prompt blink.
-    /// Does NOT auto-transition — only Space triggers reset.
-    ///
-    /// Returns `Some(GameState::Playing(...))` when Space is detected,
-    /// with a full game reset (3 lives, 0 coins, no checkpoint, level start).
     pub fn update(&mut self, dt: f32) -> Option<GameState> {
         self.blink_phase += dt;
-
-        // Space detection: in production, this reads InputState.
-        // For unit testing, the state stays in Victory without Space input.
-
-        None // No auto-transition — Space must be explicitly detected externally.
+        if self.screen_w > 0.0
+            && macroquad::input::is_key_pressed(macroquad::input::KeyCode::Space)
+        {
+            let mut player = Player::new(PlayerConfig::default());
+            player.pos.y = 584.0;
+            player.on_ground = true;
+            let life_state = LifeState::new();
+            let mut playing = PlayingState::new(player, life_state);
+            playing.screen_w = self.screen_w;
+            playing.screen_h = self.screen_h;
+            return Some(GameState::Playing(Box::new(playing)));
+        }
+        None
     }
 
-    /// Renders the Victory overlay.
-    ///
-    /// # Visual Contract (§Visual Rendering Contract)
-    /// - Full-viewport 65% black overlay
-    /// - "VICTORY!" title: 16px gold (#F8B800), centered, Y ≈ viewport.h * 0.40
-    /// - "Coins: NNN" counter: 10px white, centered below title, 3-digit zero-padded
-    /// - "Press Space to Play Again": 8px white, centered below coins, blinking at 2Hz
     pub fn render(&mut self, _alpha: f32) {
-        // Rendering is deferred to the Macroquad draw loop.
-        // This method exists for the StateMachine trait contract.
+        if self.screen_w <= 0.0 { return; }
+        use macroquad::prelude::*;
+        // 65% black overlay
+        draw_rectangle(0.0, 0.0, self.screen_w, self.screen_h, Color::new(0.0, 0.0, 0.0, 0.65));
+        let cx = self.screen_w / 2.0;
+        let title_size = 40.0;
+        draw_text("VICTORY!", cx - 80.0, self.screen_h * 0.35, title_size, Color::new(0.97, 0.72, 0.0, 1.0));
+        let coin_text = format!("Coins: {:03}", self.coins);
+        draw_text(&coin_text, cx - 50.0, self.screen_h * 0.48, 24.0, WHITE);
+        // Blinking restart prompt at 2Hz
+        if (self.blink_phase * 2.0) as u32 % 2 == 0 {
+            draw_text("Press Space to Play Again", cx - 130.0, self.screen_h * 0.58, 18.0, WHITE);
+        }
     }
 }

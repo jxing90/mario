@@ -4,16 +4,18 @@
 // The primary gameplay state. Manages player physics, hazard/flagpole/checkpoint
 // detection, invulnerability timers, and triggers transitions to Dead/Victory.
 
+use crate::entities::coin::Coin;
 use crate::entities::enemy::{Enemy, EnemyConfig};
 use crate::entities::player::Player;
 use crate::entities::flagpole::{Flagpole, FlagpolePhase};
 use crate::entities::checkpoint::Checkpoint;
+use crate::entities::question_block::QuestionBlock;
 use crate::level::{Level, LevelBounds, Vec2};
 use crate::systems::camera::Camera;
 use crate::systems::camera::CameraConfig;
 use crate::systems::hud::HudRenderer;
 use crate::systems::physics::{CollisionEvent, Physics};
-use crate::states::LifeState;
+use crate::states::{GameState, LifeState, VictoryState, GameOverState};
 
 /// The main gameplay state — normal play, hazard detection, and flagpole/checkpoint logic.
 ///
@@ -35,11 +37,12 @@ pub struct PlayingState {
     pub flagpole: Flagpole,
     pub checkpoints: Vec<Checkpoint>,
     pub enemies: Vec<Enemy>,
+    pub coins: Vec<Coin>,
+    pub question_blocks: Vec<QuestionBlock>,
     pub invuln_timer: f32,
     pub flicker_phase: f32,
+    pub frame_count: u64,
     pub hud: HudRenderer,
-    /// Actual window dimensions for screen-space coordinate scaling.
-    /// Set by main.rs after window creation. (0,0) = test mode → render is no-op.
     pub screen_w: f32,
     pub screen_h: f32,
     level_bounds: LevelBounds,
@@ -58,6 +61,27 @@ impl PlayingState {
         let checkpoints: Vec<Checkpoint> = vec![
             Checkpoint::new(Vec2 { x: 500.0, y: 400.0 }),
         ];
+
+        // Coins placed at hardcoded positions (matching Level::new layout)
+        let coins: Vec<Coin> = vec![
+            (200.0, 550.0), (240.0, 550.0), (280.0, 550.0),
+            (500.0, 400.0), (540.0, 400.0), (580.0, 400.0),
+            (1100.0, 270.0), (1140.0, 270.0),
+            (1500.0, 500.0), (1540.0, 500.0), (1580.0, 500.0),
+        ]
+        .into_iter()
+        .map(|(x, y)| Coin::new(Vec2 { x, y }))
+        .collect();
+
+        // Question blocks at hardcoded positions
+        let question_blocks: Vec<QuestionBlock> = vec![
+            (450.0, 400.0),
+            (1050.0, 270.0),
+            (1400.0, 350.0),
+        ]
+        .into_iter()
+        .map(|(x, y)| QuestionBlock::new(Vec2 { x, y }))
+        .collect();
 
         // Hardcoded patrol enemies placed on the ground (y=584 for 16x16 foot-anchored collider on ground at y=600)
         let enemies: Vec<Enemy> = vec![
@@ -83,8 +107,11 @@ impl PlayingState {
             flagpole,
             checkpoints,
             enemies,
+            coins,
+            question_blocks,
             invuln_timer: 0.0,
             flicker_phase: 0.0,
+            frame_count: 0,
             hud: HudRenderer::new(),
             screen_w: 0.0,
             screen_h: 0.0,
@@ -96,7 +123,11 @@ impl PlayingState {
     ///
     /// Runs: invuln countdown → enemy patrol → player physics → hazard check → enemy check
     /// → flagpole check → checkpoint activation → event consumption. Transitions to Dead/Victory when triggered.
-    pub fn update(&mut self, dt: f32) {
+    /// Returns Some(GameState::Victory) when flagpole slide completes,
+    /// Some(GameState::GameOver) when lives reach 0, or None to continue playing.
+    pub fn update(&mut self, dt: f32) -> Option<GameState> {
+        self.frame_count = self.frame_count.wrapping_add(1);
+
         // 1. Advance invulnerability timer
         if self.invuln_timer > 0.0 {
             self.invuln_timer -= dt;
@@ -109,7 +140,10 @@ impl PlayingState {
         // 2. Flagpole slide animation (if active, advance and check completion)
         if self.flagpole.phase == FlagpolePhase::Sliding {
             self.flagpole.update(dt);
-            return; // Input locked, no player update during slide
+            if self.flagpole.phase == FlagpolePhase::Done {
+                return Some(GameState::Victory(VictoryState::new(self.player.coins)));
+            }
+            return None; // Input locked, no player update during slide
         }
 
         // 3. Enemy patrol update (Step A: enemy.update(dt) for each living enemy)
@@ -127,6 +161,41 @@ impl PlayingState {
             crate::input::InputState::default()
         };
         self.player.update(dt, &input, &terrain);
+
+        // 4b. Coin collection: player overlaps uncollected coin → collect
+        for coin in self.coins.iter_mut() {
+            if !coin.collected && self.player.collider().intersects(&coin.collider()) {
+                coin.collected = true;
+                self.player.coins += 1;
+            }
+        }
+
+        // 4c. Question block hit: player head hits block from below
+        for block in self.question_blocks.iter_mut() {
+            if !block.used {
+                let block_aabb = block.collider();
+                let player_aabb = self.player.collider();
+                // Hit from below: player bottom is below block top, player was moving upward
+                if player_aabb.intersects(&block_aabb)
+                    && self.player.vel.y < 0.0
+                    && (player_aabb.y + player_aabb.h) > block_aabb.y
+                    && player_aabb.y < block_aabb.y + block_aabb.h
+                {
+                    block.used = true;
+                    self.player.vel.y = 100.0;
+                    // Pseudo-random roll from frame counter
+                    let roll = ((self.frame_count.wrapping_mul(6364136223846793005).wrapping_add(1)) as f64
+                        / u64::MAX as f64) as f32;
+                    if roll < 0.70 {
+                        self.player.coins += 1;
+                    } else if roll < 0.85 {
+                        self.player.apply_powerup(crate::entities::player::PlayerState::Super);
+                    } else {
+                        self.player.apply_powerup(crate::entities::player::PlayerState::Fire);
+                    }
+                }
+            }
+        }
 
         // 5. Hazard check: if player is NOT invulnerable and hazards exist → death
         let kill_y = self.level_bounds.kill_y;
@@ -175,6 +244,13 @@ impl PlayingState {
 
         // 11. Update camera to follow player (IAPI-007 + IAPI-008)
         self.camera.update(self.player.pos(), self.level_bounds, dt);
+
+        // 12. Check Game Over: lives exhausted
+        if self.player.lives == 0 {
+            return Some(GameState::GameOver(GameOverState::new(self.player.coins)));
+        }
+
+        None // Continue playing
     }
 
     /// Reads keyboard state from Macroquad and returns an InputState snapshot.
@@ -279,36 +355,26 @@ impl PlayingState {
             draw_rectangle(sx_pos, sy_pos, 16.0 * sx, 8.0 * sy, spike_color);
         }
 
-        // ── 4. Coins (yellow circles) ──
+        // ── 4. Coins (yellow circles, only uncollected) ──
         use macroquad::shapes::draw_circle;
         let coin_color = macroquad::color::YELLOW;
-        // Coin positions from Level::new
-        for &(cx, cy) in &[
-            (200.0, 550.0),
-            (240.0, 550.0),
-            (280.0, 550.0),
-            (500.0, 400.0),
-            (540.0, 400.0),
-            (580.0, 400.0),
-            (1100.0, 270.0),
-            (1140.0, 270.0),
-        ] {
-            let (scx, scy) = ws(cx, cy);
-            draw_circle(scx, scy, 6.0 * sx.min(sy), coin_color);
+        for coin in &self.coins {
+            if !coin.collected {
+                let (scx, scy) = ws(coin.pos.x, coin.pos.y);
+                draw_circle(scx, scy, 6.0 * sx.min(sy), coin_color);
+            }
         }
 
-        // ── 5. Question blocks (orange with "?") ──
+        // ── 5. Question blocks (orange "?" or dark "used") ──
         use macroquad::text::draw_text;
-        let qblock_color = macroquad::color::Color::new(1.0, 0.65, 0.0, 1.0);
-        let qblock_text_color = macroquad::color::WHITE;
-        for &(bx, by) in &[
-            (450.0, 400.0),
-            (1050.0, 270.0),
-            (1400.0, 350.0),
-        ] {
-            let (sbx, sby) = ws(bx, by);
-            draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, qblock_color);
-            draw_text("?", sbx + 8.0 * sx, sby + 24.0 * sy, 24.0 * sx.min(sy), qblock_text_color);
+        for block in &self.question_blocks {
+            let (sbx, sby) = ws(block.pos.x, block.pos.y);
+            if block.used {
+                draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, macroquad::color::DARKGRAY);
+            } else {
+                draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, macroquad::color::Color::new(1.0, 0.65, 0.0, 1.0));
+                draw_text("?", sbx + 8.0 * sx, sby + 24.0 * sy, 24.0 * sx.min(sy), macroquad::color::WHITE);
+            }
         }
 
         // ── 6. Checkpoints ──
