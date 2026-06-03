@@ -42,6 +42,10 @@ pub struct PlayingState {
     pub invuln_timer: f32,
     pub flicker_phase: f32,
     pub frame_count: u64,
+    /// Previous frame's Space key state (for reliable edge detection).
+    prev_jump_down: bool,
+    /// Jump input buffer: frames remaining until buffered jump expires.
+    jump_buffer: u8,
     pub hud: HudRenderer,
     pub screen_w: f32,
     pub screen_h: f32,
@@ -108,6 +112,8 @@ impl PlayingState {
             invuln_timer: 0.0,
             flicker_phase: 0.0,
             frame_count: 0,
+            prev_jump_down: false,
+            jump_buffer: 0,
             hud: HudRenderer::new(),
             screen_w: 0.0,
             screen_h: 0.0,
@@ -259,17 +265,42 @@ impl PlayingState {
         None // Continue playing
     }
 
-    /// Reads keyboard state from Macroquad and returns an InputState snapshot.
+    /// Reads keyboard state with reliable edge detection.
     ///
-    /// Arrow keys or WASD for movement, Space for jump, Shift for sprint,
-    /// Escape for menu toggle, Enter for confirm.
-    fn read_input(&self) -> crate::input::InputState {
+    /// Uses own prev_jump_down tracking instead of Macroquad's is_key_pressed()
+    /// which can miss edges at variable frame rates. Also implements a 6-frame
+    /// jump buffer: if Space is pressed while airborne, the jump triggers
+    /// automatically upon landing within the buffer window (~100ms).
+    fn read_input(&mut self) -> crate::input::InputState {
         use macroquad::input::{is_key_down, is_key_pressed, KeyCode};
+
+        let jump_down = is_key_down(KeyCode::Space);
+
+        // Edge detection: rising edge on Space
+        let jump_just_now = jump_down && !self.prev_jump_down;
+
+        // Feed the jump buffer: if Space pressed while airborne, remember it
+        if jump_just_now {
+            self.jump_buffer = 6; // ~100ms at 60fps
+        }
+
+        // Consume buffer: trigger jump_just on the first grounded frame after buffered press
+        let buffered_jump = self.jump_buffer > 0 && self.player.on_ground;
+
+        self.prev_jump_down = jump_down;
+
+        // Decrement buffer each frame
+        if self.jump_buffer > 0 && self.player.on_ground {
+            self.jump_buffer = 0; // consumed
+        } else if self.jump_buffer > 0 {
+            self.jump_buffer -= 1;
+        }
+
         crate::input::InputState {
             left: is_key_down(KeyCode::Left) || is_key_down(KeyCode::A),
             right: is_key_down(KeyCode::Right) || is_key_down(KeyCode::D),
-            jump: is_key_down(KeyCode::Space),
-            jump_just: is_key_pressed(KeyCode::Space),
+            jump: jump_down,
+            jump_just: jump_just_now || buffered_jump,
             sprint: is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift),
             esc_just: is_key_pressed(KeyCode::Escape),
             confirm: is_key_pressed(KeyCode::Enter),
