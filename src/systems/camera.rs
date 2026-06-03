@@ -94,4 +94,9 @@ impl Camera {
     pub fn offset(&self) -> Vec2 {
         self.offset
     }
+
+    /// Returns the viewport dimensions (width, height) from the camera config.
+    pub fn viewport(&self) -> (f32, f32) {
+        (self.config.viewport_w, self.config.viewport_h)
+    }
 }

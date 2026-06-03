@@ -7,14 +7,16 @@
 // at viewport (3%, 3%) with ±2% tolerance. Coin icon + count on first row,
 // heart icon + lives count on second row. Text uses 1px black outline pixel font.
 //
-// NOTE: Actual Macroquad draw calls (draw_texture_ex, draw_text_ex) are deferred to
-// the PlayingState integration phase where a GL context is active. Unit tests verify
-// coordinate computation, layout logic, and defensive viewport guards — visual output
-// is verified in Feature-ST via manual screenshots (env-guide.md §5).
-//
 // Texture2D fields are Option-wrapped because macroquad/miniquad types require an
 // active GL context to construct, which is unavailable during `cargo test`.
+// Draw calls are guarded by Option checks — they no-op when textures are absent.
 
+use macroquad::color::{BLACK, WHITE};
+use macroquad::math::Vec2;
+use macroquad::text::draw_text_ex;
+use macroquad::text::TextParams;
+use macroquad::texture::draw_texture_ex;
+use macroquad::texture::DrawTextureParams;
 use macroquad::texture::Texture2D;
 
 use crate::entities::player::PlayerStats;
@@ -77,26 +79,94 @@ impl HudRenderer {
     /// §4 Raises: If viewport_w <= 0.0 or viewport_h <= 0.0 → early return, no drawing.
     ///   NaN or infinite viewport dimensions also trigger early return.
     ///
-    /// Actual Macroquad draw calls (draw_texture_ex, draw_text_ex) are invoked during
-    /// game runtime where a GL context is active. Unit tests verify coordinate logic only.
+    /// Draw calls are guarded by Option<Texture2D> — when textures are None (e.g. during
+    /// `cargo test` with no GL context), icon rendering is skipped. Text rendering always
+    /// executes; at runtime the Macroquad draw queue will flush to the GPU.
     pub fn render(&self, stats: PlayerStats, viewport_w: f32, viewport_h: f32) {
         // Guard: invalid viewport → early return (no drawing, no panic).
-        // Catches zero, negative, NaN, and infinite viewport dimensions.
         if !(viewport_w > 0.0 && viewport_h > 0.0) {
             return;
         }
 
-        let _anchor = Self::compute_anchor(viewport_w, viewport_h);
-        let _icon_size = Self::rendered_icon_size();
+        let (anchor_x, anchor_y) = Self::compute_anchor(viewport_w, viewport_h);
+        let icon_size = Self::rendered_icon_size();
 
-        // Layout positions computed (verified by unit tests via compute_anchor,
-        // outline_positions, rendered_icon_size). Actual draw calls:
-        //   draw_texture_ex(coin_tex, anchor_x, anchor_y, ...)
-        //   draw_text_with_outline(coins, coin_text_x, coin_text_y, font_size)
-        //   draw_texture_ex(heart_tex, anchor_x, heart_icon_y, ...)
-        //   draw_text_with_outline(lives, lives_text_x, lives_text_y, font_size)
-        // are invoked at game runtime where a GL context is available.
-        let _ = stats;
+        // Skip all draw calls when textures are not loaded (no GL context).
+        // During `cargo test`, macroquad/miniquad is not initialized and calling
+        // draw_texture_ex / draw_text_ex would panic. At runtime, textures are
+        // loaded by PlayingState before the first frame.
+        if self.coin_tex.is_none() && self.heart_tex.is_none() {
+            return;
+        }
+
+        // --- layout positions (§6 Implementation Summary §3) ---
+        let coin_text_x = anchor_x + icon_size + 4.0; // icon right + 4px gap
+        let coin_text_y = anchor_y;
+        let heart_icon_y = anchor_y + icon_size + 4.0; // below coin row + 4px gap
+        let lives_text_x = anchor_x + icon_size + 4.0;
+        let lives_text_y = heart_icon_y;
+
+        // --- draw coin icon (§Visual Rendering Contract Element 1) ---
+        if let Some(tex) = self.coin_tex.as_ref() {
+            draw_texture_ex(
+                tex,
+                anchor_x,
+                anchor_y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(icon_size, icon_size)),
+                    ..Default::default()
+                },
+            );
+        }
+
+        // --- draw coin count text with 1px black outline (§Visual Rendering Contract Element 2) ---
+        {
+            let s = stats.coins.to_string();
+            for (i, &(ox, oy)) in Self::outline_positions(coin_text_x, coin_text_y).iter().enumerate() {
+                draw_text_ex(
+                    &s,
+                    ox,
+                    oy,
+                    TextParams {
+                        font_size: self.font_size,
+                        color: if i < 4 { BLACK } else { WHITE },
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        // --- draw heart icon (§Visual Rendering Contract Element 3) ---
+        if let Some(tex) = self.heart_tex.as_ref() {
+            draw_texture_ex(
+                tex,
+                anchor_x,
+                heart_icon_y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(Vec2::new(icon_size, icon_size)),
+                    ..Default::default()
+                },
+            );
+        }
+
+        // --- draw lives count text with 1px black outline (§Visual Rendering Contract Element 4) ---
+        {
+            let s = stats.lives.to_string();
+            for (i, &(ox, oy)) in Self::outline_positions(lives_text_x, lives_text_y).iter().enumerate() {
+                draw_text_ex(
+                    &s,
+                    ox,
+                    oy,
+                    TextParams {
+                        font_size: self.font_size,
+                        color: if i < 4 { BLACK } else { WHITE },
+                        ..Default::default()
+                    },
+                );
+            }
+        }
     }
 
     /// Returns the rendered icon size in pixels (source_size * icon_scale).
@@ -125,6 +195,15 @@ impl HudRenderer {
     /// No opaque/semi-transparent background rectangle is drawn behind HUD elements.
     pub fn draws_background() -> bool {
         false
+    }
+
+    /// Set the icon textures after loading at runtime (when GL context is active).
+    ///
+    /// During tests, textures remain `None` and draw calls skip icon rendering.
+    #[allow(dead_code)]
+    pub fn set_textures(&mut self, coin_tex: Texture2D, heart_tex: Texture2D) {
+        self.coin_tex = Some(coin_tex);
+        self.heart_tex = Some(heart_tex);
     }
 }
 

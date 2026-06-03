@@ -11,6 +11,7 @@ use crate::entities::checkpoint::Checkpoint;
 use crate::level::{Level, LevelBounds, Vec2};
 use crate::systems::camera::Camera;
 use crate::systems::camera::CameraConfig;
+use crate::systems::hud::HudRenderer;
 use crate::systems::physics::{CollisionEvent, Physics};
 use crate::states::LifeState;
 
@@ -36,6 +37,7 @@ pub struct PlayingState {
     pub enemies: Vec<Enemy>,
     pub invuln_timer: f32,
     pub flicker_phase: f32,
+    pub hud: HudRenderer,
     level_bounds: LevelBounds,
 }
 
@@ -79,6 +81,7 @@ impl PlayingState {
             enemies,
             invuln_timer: 0.0,
             flicker_phase: 0.0,
+            hud: HudRenderer::new(),
             level_bounds: bounds,
         }
     }
@@ -189,8 +192,8 @@ impl PlayingState {
 
     /// Renders the playing state (player, level, camera, HUD).
     pub fn render(&mut self, _alpha: f32) {
-        // Rendering is deferred to the Macroquad draw loop.
-        // This method exists for the StateMachine trait contract.
-        // In production, this would call draw_texture, draw_rectangle, etc.
+        let stats = self.player.stats();
+        let (vp_w, vp_h) = self.camera.viewport();
+        self.hud.render(stats, vp_w, vp_h);
     }
 }
