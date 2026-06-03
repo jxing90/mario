@@ -45,6 +45,7 @@ pub struct PlayingState {
     pub hud: HudRenderer,
     pub screen_w: f32,
     pub screen_h: f32,
+    pub current_level: u32,
     level_bounds: LevelBounds,
 }
 
@@ -54,7 +55,12 @@ impl PlayingState {
     /// Level, camera, flagpole, and checkpoints are initialized with defaults.
     /// Flagpole is placed at the end of the level (x=1800, y=560).
     pub fn new(player: Player, life_state: LifeState) -> Self {
-        let level = Level::new();
+        Self::with_level(player, life_state, 1)
+    }
+
+    /// Creates a PlayingState for a specific level number (1-4).
+    pub fn with_level(player: Player, life_state: LifeState, level_num: u32) -> Self {
+        let level = Level::load(level_num);
         let camera = Camera::new(CameraConfig::default());
         let bounds = level.bounds();
 
@@ -105,6 +111,7 @@ impl PlayingState {
             hud: HudRenderer::new(),
             screen_w: 0.0,
             screen_h: 0.0,
+            current_level: level_num,
             level_bounds: bounds,
         }
     }
@@ -131,7 +138,9 @@ impl PlayingState {
         if self.flagpole.phase == FlagpolePhase::Sliding {
             self.flagpole.update(dt);
             if self.flagpole.phase == FlagpolePhase::Done {
-                return Some(GameState::Victory(VictoryState::new(self.player.coins)));
+                return Some(GameState::Victory(VictoryState::new(
+                    self.player.coins, self.current_level,
+                )));
             }
             return None; // Input locked, no player update during slide
         }
@@ -312,15 +321,38 @@ impl PlayingState {
             ((wx - cam.x) * sx, (wy - cam.y) * sy)
         };
 
-        // ── 1. Sky background ──
-        macroquad::prelude::clear_background(macroquad::color::Color::new(
-            0.35, 0.65, 0.95, 1.0,
-        ));
+        // ── 1. Background (themed per level) ──
+        use macroquad::color::Color;
+        let (bg_color, ground_color, plat_color, spike_color) = match self.current_level {
+            1 => (  // Green Plains: blue sky, green ground, brown bricks
+                Color::new(0.35, 0.65, 0.95, 1.0),
+                Color::new(0.40, 0.75, 0.30, 1.0),
+                Color::new(0.55, 0.35, 0.15, 1.0),
+                Color::new(0.9, 0.2, 0.1, 1.0),
+            ),
+            2 => (  // Underground: dark cavern, gray stone, blue-gray bricks
+                Color::new(0.05, 0.05, 0.12, 1.0),
+                Color::new(0.25, 0.25, 0.30, 1.0),
+                Color::new(0.40, 0.45, 0.55, 1.0),
+                Color::new(0.85, 0.15, 0.05, 1.0),
+            ),
+            3 => (  // Sky World: light blue, white clouds, golden platforms
+                Color::new(0.55, 0.80, 1.0, 1.0),
+                Color::new(0.85, 0.90, 0.95, 1.0),
+                Color::new(0.95, 0.75, 0.30, 1.0),
+                Color::new(0.7, 0.15, 0.55, 1.0),
+            ),
+            _ => (  // Castle: dark red-black, dark stone, gray bricks
+                Color::new(0.08, 0.02, 0.04, 1.0),
+                Color::new(0.30, 0.25, 0.25, 1.0),
+                Color::new(0.50, 0.45, 0.45, 1.0),
+                Color::new(1.0, 0.25, 0.05, 1.0),
+            ),
+        };
+        macroquad::prelude::clear_background(bg_color);
 
         // ── 2. Ground & elevated platforms ──
         use macroquad::shapes::draw_rectangle;
-        let ground_color = macroquad::color::Color::new(0.40, 0.75, 0.30, 1.0);
-        let plat_color = macroquad::color::Color::new(0.55, 0.35, 0.15, 1.0);
 
         // Ground: (0, 600, 2000, 40)
         {
@@ -338,9 +370,8 @@ impl PlayingState {
             draw_rectangle(px, py, 250.0 * sx, 30.0 * sy, plat_color);
         }
 
-        // ── 3. Spikes (red triangles approximated as rectangles) ──
-        let spike_color = macroquad::color::Color::new(0.9, 0.2, 0.1, 1.0);
-        for &spike_x in &[300.0_f32, 700.0, 1100.0] {
+        // ── 3. Spikes ──
+        for &spike_x in &[300.0_f32, 700.0, 1100.0, 1500.0] {
             let (sx_pos, sy_pos) = ws(spike_x, 592.0);
             draw_rectangle(sx_pos, sy_pos, 16.0 * sx, 8.0 * sy, spike_color);
         }
@@ -454,9 +485,16 @@ impl PlayingState {
         let font_size = 18.0 * sx.min(sy);
         let stats = self.player.stats();
         draw_text(
-            &format!("COINS: {}   LIVES: {}", stats.coins, stats.lives),
+            &format!("WORLD 1-{}", self.current_level),
             10.0,
             30.0 * sy,
+            font_size,
+            macroquad::color::WHITE,
+        );
+        draw_text(
+            &format!("COINS: {}   LIVES: {}", stats.coins, stats.lives),
+            10.0,
+            55.0 * sy,
             font_size,
             macroquad::color::WHITE,
         );

@@ -120,15 +120,25 @@ pub struct Level {
 }
 
 impl Default for Level {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self { Self::load(1) }
 }
 
 impl Level {
-    /// Loads the level from the embedded assets/level.json.
-    pub fn new() -> Self {
-        let json = include_str!("../assets/level.json");
+    /// Loads a level from the embedded assets/levels/{n}.json.
+    /// Panics if the file is missing or invalid JSON.
+    pub fn new() -> Self { Self::load(1) }
+
+    /// Load level n (1-4). Falls back to level 1 for invalid numbers.
+    pub fn load(n: u32) -> Self {
+        let json: &str = match n {
+            1 => include_str!("../assets/levels/1.json"),
+            2 => include_str!("../assets/levels/2.json"),
+            3 => include_str!("../assets/levels/3.json"),
+            4 => include_str!("../assets/levels/4.json"),
+            _ => include_str!("../assets/levels/1.json"),
+        };
         let data: JsonLevel = serde_json::from_str(json)
-            .expect("Failed to parse assets/level.json");
+            .unwrap_or_else(|e| panic!("Failed to parse level {n}: {e}"));
 
         let platforms: Vec<Platform> = data.platforms.iter().map(|p| Platform {
             aabb: AABB { x: p.x, y: p.y, w: p.w, h: p.h },
