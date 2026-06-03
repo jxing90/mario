@@ -57,47 +57,37 @@ impl PlayingState {
         let level = Level::new();
         let camera = Camera::new(CameraConfig::default());
         let bounds = level.bounds();
-        let flagpole = Flagpole::new(Vec2 { x: 1800.0, y: 560.0 });
-        let checkpoints: Vec<Checkpoint> = vec![
-            Checkpoint::new(Vec2 { x: 500.0, y: 400.0 }),
-        ];
 
-        // Coins placed at hardcoded positions (matching Level::new layout)
-        let coins: Vec<Coin> = vec![
-            (200.0, 550.0), (240.0, 550.0), (280.0, 550.0),
-            (500.0, 400.0), (540.0, 400.0), (580.0, 400.0),
-            (1100.0, 270.0), (1140.0, 270.0),
-            (1500.0, 500.0), (1540.0, 500.0), (1580.0, 500.0),
-        ]
-        .into_iter()
-        .map(|(x, y)| Coin::new(Vec2 { x, y }))
-        .collect();
+        // Spawn flagpole from level config
+        let flagpole = Flagpole::new(Vec2 {
+            x: level.flagpole_spawn.pos.x,
+            y: level.flagpole_spawn.pos.y,
+        });
 
-        // Question blocks at hardcoded positions
-        let question_blocks: Vec<QuestionBlock> = vec![
-            (450.0, 400.0),
-            (1050.0, 270.0),
-            (1400.0, 350.0),
-        ]
-        .into_iter()
-        .map(|(x, y)| QuestionBlock::new(Vec2 { x, y }))
-        .collect();
+        // Spawn checkpoints from level config
+        let checkpoints: Vec<Checkpoint> = level.checkpoint_spawns.iter()
+            .map(|c| Checkpoint::new(Vec2 { x: c.pos.x, y: c.pos.y }))
+            .collect();
 
-        // Hardcoded patrol enemies placed on the ground (y=584 for 16x16 foot-anchored collider on ground at y=600)
-        let enemies: Vec<Enemy> = vec![
-            Enemy::new(
-                Vec2 { x: 200.0, y: 584.0 },
-                Vec2 { x: 100.0, y: 584.0 },
-                Vec2 { x: 300.0, y: 584.0 },
+        // Spawn coins from level config
+        let coins: Vec<Coin> = level.coin_spawns.iter()
+            .map(|c| Coin::new(Vec2 { x: c.pos.x, y: c.pos.y }))
+            .collect();
+
+        // Spawn question blocks from level config
+        let question_blocks: Vec<QuestionBlock> = level.block_spawns.iter()
+            .map(|b| QuestionBlock::new(Vec2 { x: b.pos.x, y: b.pos.y }))
+            .collect();
+
+        // Spawn enemies from level config
+        let enemies: Vec<Enemy> = level.enemy_spawns.iter()
+            .map(|e| Enemy::new(
+                Vec2 { x: e.pos.x, y: e.pos.y },
+                Vec2 { x: e.waypoint_a.x, y: e.waypoint_a.y },
+                Vec2 { x: e.waypoint_b.x, y: e.waypoint_b.y },
                 EnemyConfig::default(),
-            ),
-            Enemy::new(
-                Vec2 { x: 800.0, y: 584.0 },
-                Vec2 { x: 700.0, y: 584.0 },
-                Vec2 { x: 900.0, y: 584.0 },
-                EnemyConfig::default(),
-            ),
-        ];
+            ))
+            .collect();
 
         Self {
             player,
