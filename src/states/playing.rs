@@ -117,10 +117,16 @@ impl PlayingState {
             enemy.update(dt);
         }
 
-        // 4. Update player physics (normal gameplay)
+        // 4. Update player physics with real keyboard input at runtime.
+        // During tests (screen_w == 0.0), use default (no input) to avoid
+        // panicking in Macroquad's is_key_down() which requires a GL context.
         let terrain = self.level.query_terrain(&self.player.collider());
-        let no_input = crate::input::InputState::default();
-        self.player.update(dt, &no_input, &terrain);
+        let input = if self.screen_w > 0.0 {
+            self.read_input()
+        } else {
+            crate::input::InputState::default()
+        };
+        self.player.update(dt, &input, &terrain);
 
         // 5. Hazard check: if player is NOT invulnerable and hazards exist → death
         let kill_y = self.level_bounds.kill_y;
@@ -169,6 +175,23 @@ impl PlayingState {
 
         // 11. Update camera to follow player (IAPI-007 + IAPI-008)
         self.camera.update(self.player.pos(), self.level_bounds, dt);
+    }
+
+    /// Reads keyboard state from Macroquad and returns an InputState snapshot.
+    ///
+    /// Arrow keys or WASD for movement, Space for jump, Shift for sprint,
+    /// Escape for menu toggle, Enter for confirm.
+    fn read_input(&self) -> crate::input::InputState {
+        use macroquad::input::{is_key_down, is_key_pressed, KeyCode};
+        crate::input::InputState {
+            left: is_key_down(KeyCode::Left) || is_key_down(KeyCode::A),
+            right: is_key_down(KeyCode::Right) || is_key_down(KeyCode::D),
+            jump: is_key_down(KeyCode::Space),
+            jump_just: is_key_pressed(KeyCode::Space),
+            sprint: is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift),
+            esc_just: is_key_pressed(KeyCode::Escape),
+            confirm: is_key_pressed(KeyCode::Enter),
+        }
     }
 
     /// Detects all hazard collision events for the current frame.
@@ -314,27 +337,44 @@ impl PlayingState {
             }
         }
 
-        // ── 9. Player ──
+        // ── 9. Player (Mario) ──
         let p = self.player.pos();
         let (spx, spy) = ws(p.x, p.y);
-        let player_h = match self.player.state {
-            crate::entities::player::PlayerState::Small => 16.0,
-            _ => 32.0, // Super or Fire — double height
-        };
-        let player_color = if self.invuln_timer > 0.0 {
-            // Flicker effect during invulnerability
-            let phase = (self.flicker_phase * 4.0) as u32;
-            if phase % 2 == 0 {
-                macroquad::color::RED
-            } else {
-                macroquad::color::Color::new(1.0, 1.0, 1.0, 0.3)
-            }
-        } else {
-            macroquad::color::RED
-        };
-        draw_rectangle(spx, spy - (player_h - 16.0) * sy, 16.0 * sx, player_h * sy, player_color);
-        // Hat
-        draw_rectangle(spx, spy - (player_h - 12.0) * sy, 16.0 * sx, 6.0 * sy, macroquad::color::RED);
+        let is_small = matches!(self.player.state, crate::entities::player::PlayerState::Small);
+        let body_h = if is_small { 16.0 } else { 32.0 };
+        let unit = body_h / 16.0; // scale factor: 1.0 for Small, 2.0 for Super/Fire
+        let sx_s = sx * unit;
+        let sy_s = sy * unit;
+
+        // Invulnerability flicker
+        let flicker = self.invuln_timer > 0.0 && ((self.flicker_phase * 4.0) as u32) % 2 == 1;
+
+        if !flicker {
+            let hat_color = macroquad::color::Color::new(0.85, 0.15, 0.1, 1.0);
+            let skin_color = macroquad::color::Color::new(1.0, 0.75, 0.55, 1.0);
+            let overall_color = macroquad::color::Color::new(0.1, 0.3, 0.9, 1.0);
+            let shoe_color = macroquad::color::Color::new(0.45, 0.25, 0.15, 1.0);
+            let eye_color = macroquad::color::BLACK;
+            let button_color = macroquad::color::YELLOW;
+            let top = spy - (body_h - 16.0) * sy;
+
+            // Hat (top 5 units)
+            draw_rectangle(spx, top, 16.0 * sx_s, 5.0 * sy_s, hat_color);
+            // Brim
+            draw_rectangle(spx - 2.0 * sx_s, top + 3.0 * sy_s, 20.0 * sx_s, 3.0 * sy_s, hat_color);
+            // Face (units 5-9)
+            draw_rectangle(spx, top + 5.0 * sy_s, 16.0 * sx_s, 4.0 * sy_s, skin_color);
+            // Eye
+            draw_rectangle(spx + 10.0 * sx_s, top + 5.5 * sy_s, 3.0 * sx_s, 2.0 * sy_s, eye_color);
+            // Overall (units 9-14)
+            draw_rectangle(spx, top + 9.0 * sy_s, 16.0 * sx_s, 5.0 * sy_s, overall_color);
+            // Buttons
+            draw_circle(spx + 8.0 * sx_s, top + 10.5 * sy_s, 1.5 * sx_s.min(sy_s), button_color);
+            draw_circle(spx + 8.0 * sx_s, top + 12.5 * sy_s, 1.5 * sx_s.min(sy_s), button_color);
+            // Shoes (bottom 2 units)
+            draw_rectangle(spx, top + 14.0 * sy_s, 7.0 * sx_s, 2.0 * sy_s, shoe_color);
+            draw_rectangle(spx + 9.0 * sx_s, top + 14.0 * sy_s, 7.0 * sx_s, 2.0 * sy_s, shoe_color);
+        }
 
         // ── 10. HUD (screen-space overlay) ──
         let font_size = 18.0 * sx.min(sy);
