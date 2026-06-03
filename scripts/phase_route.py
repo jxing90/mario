@@ -63,10 +63,10 @@ def _select_next(features: list) -> tuple:
     """Return (pick_feature, blocked_ids). pick=None + blocked_ids non-empty
     means all failing features are dep-blocked (cycle / misconfig)."""
     active = [x for x in features if not x.get("deprecated")]
-    passing = {x["id"] for x in active if x.get("status") == "passing"}
-    failing = [x for x in active if x.get("status") != "passing"]
+    non_failing = {x["id"] for x in active if x.get("status") in ("passing", "done")}
+    failing = [x for x in active if x.get("status") not in ("passing", "done")]
     eligible = [x for x in failing
-                if all(d in passing for d in x.get("dependencies", []))]
+                if all(d in non_failing for d in x.get("dependencies", []))]
     if not eligible:
         return None, [x["id"] for x in failing]
     eligible.sort(key=lambda f: (_PRIORITY_RANK.get(f.get("priority"), 3),
@@ -148,10 +148,14 @@ def route(root: str = ".") -> dict:
             out["feature_id"] = cur["feature_id"]
             return out
 
-        # current is null: either pick next or route to system ST
+        # current is null: either pick next, route to system ST, or mark complete
         if counts["total"] == 0:
             return out  # no active features
-        if counts["passing"] == counts["total"]:
+        if counts.get("done", 0) == counts["total"]:
+            # All features marked done — project complete
+            out["next_skill"] = None
+            return out
+        if counts["passing"] + counts.get("done", 0) == counts["total"]:
             out["next_skill"] = "long-task-st"
             return out
 

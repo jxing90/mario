@@ -28,7 +28,7 @@ import sys
 
 REQUIRED_FIELDS = {"id", "category", "title", "description", "priority", "status"}
 SRS_TRACE_PATTERN = re.compile(r"^(?:FR|NFR|IFR)-\d{3}[a-z]?$")
-VALID_STATUSES = {"failing", "passing"}
+VALID_STATUSES = {"failing", "passing", "done"}
 VALID_PHASES = {"design", "tdd", "st"}
 VALID_PRIORITIES = {"high", "medium", "low"}
 VALID_LANGUAGES = {"python", "java", "javascript", "typescript", "c", "cpp", "c++", "go", "rust"}

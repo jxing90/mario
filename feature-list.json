@@ -33,7 +33,7 @@
       "title": "Engine Core",
       "description": "Initialize Macroquad window with virtual render target, establish 60fps fixed-timestep game loop with accumulator (max 5 catch-up steps), coordinate state-machine update → physics → render pipeline each frame. Respond to display config changes (IAPI-011).",
       "priority": "high",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-018"
       ],
@@ -57,7 +57,7 @@
       "title": "Level & Background",
       "description": "Define single-level platform geometry, level bounds (min_x, max_x, kill_y), and 3-layer parallax background textures as hardcoded constants. Provide terrain query (IAPI-005) for physics collision and level bounds (IAPI-008) for camera clamping.",
       "priority": "high",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-006"
       ],
@@ -81,7 +81,7 @@
       "title": "Player Controller",
       "description": "Manage player entity: horizontal movement (acceleration/friction/reversal), variable-height jump (hold duration controls height, ceiling collision), sprint (1.5x speed, jump distance bonus), ground/air state transitions. Output PlayerStats (IAPI-009) for HUD and pos() (IAPI-007) for camera. Power-up state machine: Small ↔ Super ↔ Fire.",
       "priority": "high",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-001",
         "FR-002",
@@ -116,7 +116,7 @@
       "title": "Camera System",
       "description": "Read Player position (IAPI-007), follow horizontally with 8%/frame convergence (player at 35-40% viewport left), vertical dead-zone covering central 60% of viewport (track at 5%/frame only when player exits zone). Clamp to level bounds (IAPI-008). Output camera offset (IAPI-010) for parallax rendering.",
       "priority": "high",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-013"
       ],
@@ -144,7 +144,7 @@
       "title": "Hazards",
       "description": "Spike entities as static danger colliders (16x8 px). Kill-plane at level Y lower bound. On player-spike overlap or player Y > kill_y, emit collision event (HazardContact / PitFall) triggering death flow. Invulnerability exempts damage during 2s window.",
       "priority": "high",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-009"
       ],
@@ -171,7 +171,7 @@
       "title": "Life, Death & Win",
       "description": "Manage lives counter (initial 3), checkpoint activation, death animation (1.5s input lock), life decrement → respawn at checkpoint (2s invulnerability + flicker 4Hz) or Game Over (lives=0). Flagpole trigger → slide animation → Victory screen with coin total + restart prompt. GameOver/Victory screens respond to Space for full state reset.",
       "priority": "high",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-014a",
         "FR-014b",
@@ -211,7 +211,7 @@
       "title": "Patrol Enemy",
       "description": "Enemy walks between two waypoints at constant speed (reverses at endpoint ≤1 frame). Collision direction-dependent: player lands from above (downward velocity > 0, player bottom vs enemy top) → enemy destroyed + player bounce; side/below contact → player death.",
       "priority": "medium",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-010"
       ],
@@ -239,7 +239,7 @@
       "title": "Collectibles & Blocks",
       "description": "Coins placed in level: collected on player collision → deactivate + coin counter +1; reset on player death & respawn. Question blocks: hit from below by player head → deactivate (show 'used' state), roll loot table (Coin 70% / Super Mushroom 15% / Fire Flower 15%), spawn reward above block. Super Mushroom bounces along ground, Fire Flower stays static at spawn position.",
       "priority": "medium",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-008",
         "FR-011"
@@ -271,7 +271,7 @@
       "title": "HUD",
       "description": "Read PlayerStats { coins, lives } from Player (IAPI-009), render coin icon + count and heart icon + lives as screen-space overlay anchored at viewport (3%, 3%) with tolerance ±2%. Update immediately within current frame on value changes. Use 1px black-outline pixel font.",
       "priority": "medium",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-016"
       ],
@@ -300,7 +300,7 @@
       "title": "Display Config",
       "description": "ESC toggles options menu overlay. Display current resolution, selectable list (720p/1080p/1440p), and fullscreen toggle. Arrow keys navigate, Enter confirms → immediately apply via IAPI-011 with nearest-neighbor scaling. ESC again closes menu.",
       "priority": "medium",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "FR-017"
       ],
@@ -328,7 +328,7 @@
       "title": "60fps Frame Rate (NFR-001)",
       "description": "The game shall render at a stable 60 frames per second at target resolution. 99% of frame render times ≤ 16.67ms; any continuous 60-second window shall maintain ≥ 58fps. Built-in FPS counter logs min/max/avg/p99 frame times.",
       "priority": "high",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "NFR-001"
       ],
@@ -353,7 +353,7 @@
       "title": "Multi-Resolution Display (NFR-002)",
       "description": "The game shall render correctly at 720p/1080p/1440p windowed and fullscreen modes. HUD anchored at (3%, 3%) viewport position with deviation ≤ ±2% of viewport dimensions. Player visible area occupies 45-50% of viewport width at all resolutions.",
       "priority": "medium",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "NFR-002"
       ],
@@ -381,7 +381,7 @@
       "title": "Pixel Art Rendering (NFR-003)",
       "description": "All sprites and level tiles shall use nearest-neighbor interpolation for scaling. At 8x magnification, pixel boundaries appear as solid-color squares with no transition colors or blurred edges. Each sprite ≤ 16 colors.",
       "priority": "medium",
-      "status": "passing",
+      "status": "done",
       "srs_trace": [
         "NFR-003"
       ],

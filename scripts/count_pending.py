@@ -40,6 +40,7 @@ def count(path: str) -> dict:
         "total": 0,
         "passing": 0,
         "failing": 0,
+        "done": 0,
         "current": data.get("current"),
         "deprecated": 0,
         "legacy_sub_status": 0,
@@ -52,8 +53,11 @@ def count(path: str) -> dict:
             result["deprecated"] += 1
             continue
         result["total"] += 1
-        if feat.get("status") == "passing":
+        status = feat.get("status")
+        if status == "passing":
             result["passing"] += 1
+        elif status == "done":
+            result["done"] += 1
         else:
             result["failing"] += 1
         if "sub_status" in feat:
