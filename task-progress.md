@@ -431,3 +431,16 @@
 - TDD: green ✓ (R-G-R complete) — 21 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+UI/palette+UI/filter+INTG/level, negative_ratio=0.43
 - Quality: line=86.26%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 NFR-003)
 - current.phase: tdd → st
+
+---
+
+### Feature #13: Pixel Art Rendering (NFR-003) — PASS
+- Completed: 2026-06-04
+- TDD: green ✓
+- Quality Gates: 86.26% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 20 cases (19 automated + 1 manual visual-judgment), all PASS
+- Inline Check: PASS (P2: 5/5 methods, T2: 21/21 tests, D3: OK (image 0.24), ATS Category: 1/1 (UI via ST-UI-013-001/002), §4: 0 files 0 violations)
+- Git: af92992 feat: feature #13 pixel-art-rendering — ST passed (20/20 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+- ⚠ [Manual] 1 manual test case requires visual verification: ST-UI-013-002 (8× magnification pixel boundary inspection at 720p/1080p/1440p) — per ATS NFR-003 visual-judgment requirement

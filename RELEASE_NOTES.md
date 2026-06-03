@@ -17,6 +17,7 @@
 - Feature #9: HUD — screen-space overlay rendering PlayerStats (coins, lives) at viewport (3%, 3%) with 1px black-outline pixel font, coin/heart icons (8x8px pixel art), instant frame update via IAPI-009, 24/24 ST cases passing
 - Feature #10: Display Config — ESC toggles options menu overlay with resolution selection (720p/1080p/1440p) and fullscreen toggle, Arrow keys navigate with wrap-around, Enter confirms via IAPI-011 with nearest-neighbor scaling, ESC closes without changes, 31/31 ST cases passing
 - Feature #12: Multi-Resolution Display (NFR-002) — ResolutionVerifier programmatic validation tool with HUD anchor (3%, 3%) self-consistency checks and player visible area ratio computations across 720p/1080p/1440p, 22/22 automated cases passing + 3 manual visual-judgment cases, 25/25 ST cases passing
+- Feature #13: Pixel Art Rendering (NFR-003) — nearest-neighbor texture filtering (apply_pixel_art_filter), sprite coordinate rounding (round_sprite_pos with banker's rounding), palette verification (SpritePalette ≤16 colors, PNG byte-level decoding for GL-context-free testing), coin.png and heart.png palette compliance verified, 19/19 automated + 1 manual visual-judgment, 20/20 ST cases passing
 
 ### Changed
 - (none yet)
