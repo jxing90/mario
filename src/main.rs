@@ -22,7 +22,7 @@ fn window_conf() -> macroquad::window::Conf {
 async fn main() {
     // Spawn player on the ground (level ground platform is at y=600)
     let mut player = Player::new(PlayerConfig::default());
-    player.pos.y = 584.0;
+    player.pos.y = 600.0; // feet on ground (rendering draws upward from pos.y)
     player.on_ground = true;
 
     let life_state = LifeState::new();

@@ -503,7 +503,8 @@ impl PlayingState {
             let shoe_color = macroquad::color::Color::new(0.45, 0.25, 0.15, 1.0);
             let eye_color = macroquad::color::BLACK;
             let button_color = macroquad::color::YELLOW;
-            let top = spy - (body_h - 16.0) * sy;
+            // Draw from foot upward: feet at pos.y, body extends up by body_h
+            let top = spy - body_h * sy;
 
             // Hat (top 5 units)
             draw_rectangle(spx, top, 16.0 * sx_s, 5.0 * sy_s, hat_color);

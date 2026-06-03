@@ -22,7 +22,7 @@ impl GameOverState {
             && macroquad::input::is_key_pressed(macroquad::input::KeyCode::Space)
         {
             let mut player = Player::new(PlayerConfig::default());
-            player.pos.y = 584.0;
+            player.pos.y = 600.0;
             player.on_ground = true;
             let life_state = LifeState::new();
             let mut playing = PlayingState::new(player, life_state);
