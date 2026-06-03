@@ -272,3 +272,14 @@
 - Git: fb785ae feat: feature #7 patrol-enemy — ST passed (17/17 cases)
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+
+### Session 17 — Feature Design #8 (2026-06-03)
+
+- **Feature #8: Collectibles & Blocks** (FR-008, FR-011) — 金币收集 + 问号方块 + 奖励道具
+- **SRS**: §FR-008 (lines 144-153), §FR-011 (lines 177-188)
+- **Design**: §2.8 (lines 256-275)
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: false
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/8-collectibles-blocks.md)
+- current.phase: design → tdd

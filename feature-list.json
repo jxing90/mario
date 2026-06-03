@@ -25,7 +25,7 @@
     "ASM-005: 分辨率配置通过游戏内选项菜单切换 —— 已在 FR-017 中覆盖"
   ],
   "required_configs": [],
-  "current": {"feature_id": 8, "phase": "design"},
+  "current": {"feature_id": 8, "phase": "tdd"},
   "features": [
     {
       "id": 1,
