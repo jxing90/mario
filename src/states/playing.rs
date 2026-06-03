@@ -41,6 +41,8 @@ pub struct PlayingState {
     pub question_blocks: Vec<QuestionBlock>,
     pub invuln_timer: f32,
     pub flicker_phase: f32,
+    /// Countdown timer in seconds (classic Mario: 300s per level).
+    pub time_remaining: f32,
     pub frame_count: u64,
     /// Previous frame's Space key state (for reliable edge detection).
     prev_jump_down: bool,
@@ -111,6 +113,7 @@ impl PlayingState {
             question_blocks,
             invuln_timer: 0.0,
             flicker_phase: 0.0,
+            time_remaining: 300.0,
             frame_count: 0,
             prev_jump_down: false,
             jump_buffer: 0,
@@ -130,6 +133,16 @@ impl PlayingState {
     /// Some(GameState::GameOver) when lives reach 0, or None to continue playing.
     pub fn update(&mut self, dt: f32) -> Option<GameState> {
         self.frame_count = self.frame_count.wrapping_add(1);
+
+        // 0. Countdown timer — death when time runs out
+        self.time_remaining -= dt;
+        if self.time_remaining <= 0.0 {
+            self.time_remaining = 0.0;
+            self.player.lives = 0;
+            return Some(GameState::GameOver(GameOverState::new(
+                self.player.coins, self.current_level,
+            )));
+        }
 
         // 1. Advance invulnerability timer
         if self.invuln_timer > 0.0 {
@@ -159,7 +172,12 @@ impl PlayingState {
         // 4. Update player physics with real keyboard input at runtime.
         // During tests (screen_w == 0.0), use default (no input) to avoid
         // panicking in Macroquad's is_key_down() which requires a GL context.
-        let terrain = self.level.query_terrain(&self.player.collider());
+        let mut terrain = self.level.query_terrain(&self.player.collider());
+        // Question blocks act as solid platforms (used or not)
+        for block in &self.question_blocks {
+            let ba = block.collider();
+            terrain.push(crate::level::Tile::Platform(ba));
+        }
         let input = if self.screen_w > 0.0 {
             self.read_input()
         } else {
@@ -525,21 +543,34 @@ impl PlayingState {
         }
 
         // ── 10. HUD (screen-space overlay) ──
-        let font_size = 18.0 * sx.min(sy);
+        let font_size = 14.0 * sx.min(sy);
         let stats = self.player.stats();
         draw_text(
             &format!("WORLD 1-{}", self.current_level),
-            10.0,
-            30.0 * sy,
+            8.0,
+            22.0 * sy,
             font_size,
             macroquad::color::WHITE,
         );
         draw_text(
-            &format!("COINS: {}   LIVES: {}", stats.coins, stats.lives),
-            10.0,
-            55.0 * sy,
+            &format!("COINS:{}  LIVES:{}", stats.coins, stats.lives),
+            8.0,
+            40.0 * sy,
             font_size,
             macroquad::color::WHITE,
+        );
+        // Time countdown
+        let time_color = if self.time_remaining <= 60.0 {
+            macroquad::color::Color::new(1.0, 0.2, 0.2, 1.0) // red when urgent
+        } else {
+            macroquad::color::WHITE
+        };
+        draw_text(
+            &format!("TIME:{}", self.time_remaining as u32),
+            8.0,
+            58.0 * sy,
+            font_size,
+            time_color,
         );
     }
 }
