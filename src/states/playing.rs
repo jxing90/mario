@@ -201,41 +201,39 @@ impl PlayingState {
         } else {
             crate::input::InputState::default()
         };
-        self.player.update(dt, &input, &terrain);
+        // 4a. Hit detection: check block/brick/coin overlap BEFORE terrain
+        // collision resolves and pushes the player away.
+        let player_aabb = self.player.collider();
+        let player_vy = self.player.vel.y;
 
-        // 4b. Coin collection: player overlaps uncollected coin → collect
+        // Coins
         for coin in self.coins.iter_mut() {
-            if !coin.collected && self.player.collider().intersects(&coin.collider()) {
+            if !coin.collected && player_aabb.intersects(&coin.collider()) {
                 coin.collected = true;
                 self.player.coins += 1;
             }
         }
 
-        // 4c. Breakable brick hit: Super/Fire Mario breaks bricks from below
+        // Breakable bricks (Super/Fire only)
         if !matches!(self.player.state, crate::entities::player::PlayerState::Small) {
             for brick in self.bricks.iter_mut() {
                 if brick.broken { continue; }
                 let ba = brick.collider();
-                let pa = self.player.collider();
-                if pa.intersects(&ba) && self.player.vel.y < 0.0
-                    && (pa.y + pa.h) > ba.y && pa.y < ba.y + ba.h
+                if player_aabb.intersects(&ba) && player_vy < 0.0
+                    && (player_aabb.y + player_aabb.h) > ba.y && player_aabb.y < ba.y + ba.h
                 {
                     brick.broken = true;
-                    self.player.vel.y = 100.0; // bounce down
+                    self.player.vel.y = 100.0;
                 }
             }
         }
 
-        // 4d. Question block hit: player head hits block from below
+        // Question blocks
         for block in self.question_blocks.iter_mut() {
             if !block.used {
-                let block_aabb = block.collider();
-                let player_aabb = self.player.collider();
-                // Hit from below: player bottom is below block top, player was moving upward
-                if player_aabb.intersects(&block_aabb)
-                    && self.player.vel.y < 0.0
-                    && (player_aabb.y + player_aabb.h) > block_aabb.y
-                    && player_aabb.y < block_aabb.y + block_aabb.h
+                let ba = block.collider();
+                if player_aabb.intersects(&ba) && player_vy < 0.0
+                    && (player_aabb.y + player_aabb.h) > ba.y && player_aabb.y < ba.y + ba.h
                 {
                     block.used = true;
                     self.player.vel.y = 100.0;
@@ -252,6 +250,10 @@ impl PlayingState {
                 }
             }
         }
+
+        // 4b. Apply player physics AFTER hit detection (so blocks can be hit
+        // before terrain collision pushes the player away).
+        self.player.update(dt, &input, &terrain);
 
         // 5. Hazard check: if player is NOT invulnerable and hazards exist → death
         let kill_y = self.level_bounds.kill_y;
