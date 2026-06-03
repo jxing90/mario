@@ -283,3 +283,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/8-collectibles-blocks.md)
 - current.phase: design → tdd
+
+### Session 18 — TDD #8 (2026-06-03)
+
+- **Feature #8: Collectibles & Blocks** (FR-008, FR-011) — 金币收集 + 问号方块 + 奖励道具
+- **Status**: failing
+- **Dependencies**: [2, 3]
+- TDD: green ✓ (R-G-R complete) — 39 tests, categories=FUNC/happy(16)+FUNC/error(7)+BNDRY/edge(11)+INTG/physics(3)+INTG/state(1)+PERF/probability(1), negative_ratio=0.462
+- Quality: line=89.14%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (2/2 FR-008+FR-011)
+- current.phase: tdd → st
