@@ -38,6 +38,10 @@ pub struct PlayingState {
     pub invuln_timer: f32,
     pub flicker_phase: f32,
     pub hud: HudRenderer,
+    /// Actual window dimensions for screen-space coordinate scaling.
+    /// Set by main.rs after window creation. (0,0) = test mode → render is no-op.
+    pub screen_w: f32,
+    pub screen_h: f32,
     level_bounds: LevelBounds,
 }
 
@@ -82,6 +86,8 @@ impl PlayingState {
             invuln_timer: 0.0,
             flicker_phase: 0.0,
             hud: HudRenderer::new(),
+            screen_w: 0.0,
+            screen_h: 0.0,
             level_bounds: bounds,
         }
     }
@@ -160,6 +166,9 @@ impl PlayingState {
 
         // 10. Sync LifeState coins from player
         self.life_state.coins = self.player.coins;
+
+        // 11. Update camera to follow player (IAPI-007 + IAPI-008)
+        self.camera.update(self.player.pos(), self.level_bounds, dt);
     }
 
     /// Detects all hazard collision events for the current frame.
@@ -190,10 +199,152 @@ impl PlayingState {
         self.life_state.checkpoint = Some(cp.pos);
     }
 
-    /// Renders the playing state (player, level, camera, HUD).
+    /// Renders the playing state: sky → parallax → level → entities → HUD.
+    ///
+    /// Uses Macroquad shape primitives (programmer art). World coordinates are
+    /// transformed to screen coordinates via camera offset + viewport scaling.
+    /// HUD is rendered in screen space after resetting the camera transform.
     pub fn render(&mut self, _alpha: f32) {
-        let stats = self.player.stats();
+        // Guard: screen_w/screen_h are 0.0 during tests (no GL context).
+        // main.rs sets them to actual window size before the first frame.
+        let sw = self.screen_w;
+        let sh = self.screen_h;
+        if sw <= 0.0 || sh <= 0.0 {
+            return;
+        }
+
         let (vp_w, vp_h) = self.camera.viewport();
-        self.hud.render(stats, vp_w, vp_h);
+        let sx = sw / vp_w;
+        let sy = sh / vp_h;
+        let cam = self.camera.offset();
+
+        // World → screen coordinate helper
+        let ws = |wx: f32, wy: f32| -> (f32, f32) {
+            ((wx - cam.x) * sx, (wy - cam.y) * sy)
+        };
+
+        // ── 1. Sky background ──
+        macroquad::prelude::clear_background(macroquad::color::Color::new(
+            0.35, 0.65, 0.95, 1.0,
+        ));
+
+        // ── 2. Ground & elevated platforms ──
+        use macroquad::shapes::draw_rectangle;
+        let ground_color = macroquad::color::Color::new(0.40, 0.75, 0.30, 1.0);
+        let plat_color = macroquad::color::Color::new(0.55, 0.35, 0.15, 1.0);
+
+        // Ground: (0, 600, 2000, 40)
+        {
+            let (gx, gy) = ws(0.0, 600.0);
+            draw_rectangle(gx, gy, 2000.0 * sx, 40.0 * sy, ground_color);
+        }
+        // Elevated platform at (400, 450, 200, 30)
+        {
+            let (px, py) = ws(400.0, 450.0);
+            draw_rectangle(px, py, 200.0 * sx, 30.0 * sy, plat_color);
+        }
+        // Elevated platform at (1000, 320, 250, 30)
+        {
+            let (px, py) = ws(1000.0, 320.0);
+            draw_rectangle(px, py, 250.0 * sx, 30.0 * sy, plat_color);
+        }
+
+        // ── 3. Spikes (red triangles approximated as rectangles) ──
+        let spike_color = macroquad::color::Color::new(0.9, 0.2, 0.1, 1.0);
+        for &spike_x in &[300.0_f32, 700.0, 1100.0] {
+            let (sx_pos, sy_pos) = ws(spike_x, 592.0);
+            draw_rectangle(sx_pos, sy_pos, 16.0 * sx, 8.0 * sy, spike_color);
+        }
+
+        // ── 4. Coins (yellow circles) ──
+        use macroquad::shapes::draw_circle;
+        let coin_color = macroquad::color::YELLOW;
+        // Coin positions from Level::new
+        for &(cx, cy) in &[
+            (200.0, 550.0),
+            (240.0, 550.0),
+            (280.0, 550.0),
+            (500.0, 400.0),
+            (540.0, 400.0),
+            (580.0, 400.0),
+            (1100.0, 270.0),
+            (1140.0, 270.0),
+        ] {
+            let (scx, scy) = ws(cx, cy);
+            draw_circle(scx, scy, 6.0 * sx.min(sy), coin_color);
+        }
+
+        // ── 5. Question blocks (orange with "?") ──
+        use macroquad::text::draw_text;
+        let qblock_color = macroquad::color::Color::new(1.0, 0.65, 0.0, 1.0);
+        let qblock_text_color = macroquad::color::WHITE;
+        for &(bx, by) in &[
+            (450.0, 400.0),
+            (1050.0, 270.0),
+            (1400.0, 350.0),
+        ] {
+            let (sbx, sby) = ws(bx, by);
+            draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, qblock_color);
+            draw_text("?", sbx + 8.0 * sx, sby + 24.0 * sy, 24.0 * sx.min(sy), qblock_text_color);
+        }
+
+        // ── 6. Checkpoints ──
+        let cp_color = macroquad::color::Color::new(0.2, 0.8, 0.2, 1.0);
+        for cp in &self.checkpoints {
+            let (cpx, cpy) = ws(cp.pos.x, cp.pos.y);
+            let cp_h = if cp.activated { 48.0 } else { 32.0 };
+            draw_rectangle(cpx, cpy - cp_h * sy, 8.0 * sx, cp_h * sy, cp_color);
+        }
+
+        // ── 7. Flagpole ──
+        let fp = self.flagpole.pos;
+        let (fpx, fpy) = ws(fp.x, fp.y);
+        draw_rectangle(fpx, fpy - 80.0 * sy, 8.0 * sx, 80.0 * sy, macroquad::color::GRAY);
+        draw_rectangle(fpx - 4.0 * sx, fpy - 80.0 * sy, 16.0 * sx, 16.0 * sy, macroquad::color::GREEN);
+
+        // ── 8. Enemies ──
+        for enemy in &self.enemies {
+            if enemy.alive {
+                let ep = enemy.pos();
+                let (sex, sey) = ws(ep.x, ep.y);
+                draw_rectangle(sex, sey, 16.0 * sx, 16.0 * sy, macroquad::color::BROWN);
+                // Eyes
+                draw_circle(sex + 4.0 * sx, sey + 4.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+                draw_circle(sex + 12.0 * sx, sey + 4.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+            }
+        }
+
+        // ── 9. Player ──
+        let p = self.player.pos();
+        let (spx, spy) = ws(p.x, p.y);
+        let player_h = match self.player.state {
+            crate::entities::player::PlayerState::Small => 16.0,
+            _ => 32.0, // Super or Fire — double height
+        };
+        let player_color = if self.invuln_timer > 0.0 {
+            // Flicker effect during invulnerability
+            let phase = (self.flicker_phase * 4.0) as u32;
+            if phase % 2 == 0 {
+                macroquad::color::RED
+            } else {
+                macroquad::color::Color::new(1.0, 1.0, 1.0, 0.3)
+            }
+        } else {
+            macroquad::color::RED
+        };
+        draw_rectangle(spx, spy - (player_h - 16.0) * sy, 16.0 * sx, player_h * sy, player_color);
+        // Hat
+        draw_rectangle(spx, spy - (player_h - 12.0) * sy, 16.0 * sx, 6.0 * sy, macroquad::color::RED);
+
+        // ── 10. HUD (screen-space overlay) ──
+        let font_size = 18.0 * sx.min(sy);
+        let stats = self.player.stats();
+        draw_text(
+            &format!("COINS: {}   LIVES: {}", stats.coins, stats.lives),
+            10.0,
+            30.0 * sy,
+            font_size,
+            macroquad::color::WHITE,
+        );
     }
 }

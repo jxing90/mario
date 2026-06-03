@@ -43,5 +43,13 @@ async fn main() {
         }
     };
 
+    // Pass actual window dimensions to PlayingState for render coordinate scaling.
+    // Must be set before the first frame; screen_width()/screen_height() are safe
+    // here because the Macroquad window is already initialized.
+    if let GameState::Playing(ref mut state) = game_state {
+        state.screen_w = macroquad::window::screen_width();
+        state.screen_h = macroquad::window::screen_height();
+    }
+
     game_loop.run(&mut game_state).await;
 }
