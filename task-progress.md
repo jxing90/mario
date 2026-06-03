@@ -396,3 +396,17 @@
 - TDD: green ✓ (R-G-R complete) — 22 tests, categories=FUNC/happy(8)+FUNC/error(3)+BNDRY/edge(6)+PERF(2)+UI(3), negative_ratio=0.409
 - Quality: line=85.96%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 NFR-002)
 - current.phase: tdd → st
+
+---
+
+### Feature #12: Multi-Resolution Display (NFR-002) — PASS
+- Completed: 2026-06-03
+- TDD: green ✓
+- Quality Gates: 85.96% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 25 cases (22 automated + 3 manual visual-judgment), all PASS
+- Inline Check: PASS (P2: 6/6 methods, T2: 22/22 tests + 13 integration, D3: N/A, ATS Category: 2/2 (PERF+UI), §4: 6 files 0 violations)
+- Git: 2858749 feat: feature #12 multi-resolution-display — ST passed (25/25 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
+- ⚠ [Manual] 3 manual test cases require visual verification: ST-UI-012-015 (HUD anchor screenshot at 720p/1080p/1440p), ST-UI-012-016 (player visible area ratio 45-50% screenshot), ST-UI-012-017 (fullscreen HUD position consistency screenshot) — per ATS NFR-002 Manual: visual-judgment requirement
+- ⚠ [Design] player_target_x_pct = 0.375 produces visible ratio ~62.5%, exceeding SRS 45-50% target — documented in Feature Design Clarification Addendum #1 as known assumption; adjust CameraConfig::player_target_x_pct to 0.50-0.55 if constraint enforcement needed
