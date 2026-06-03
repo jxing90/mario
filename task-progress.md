@@ -329,3 +329,14 @@
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
 - ⚠ [Design] P2 3 benign deviations: LootTable::roll → roll_with_value, PlayingState::shoot_fireball/reset_collectibles integrated into update/LifeState
+
+### Feature #9: HUD — PASS
+- Completed: 2026-06-03
+- TDD: green ✓
+- Quality Gates: 89.20% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 24 cases, all PASS
+- Inline Check: PASS (P2: 2/2 methods, T2: 24/24 tests, D3: OK, ATS Category: 3/3, §4: 4 files 0 violations)
+- Git: 8af6fb1 feat: feature #9 hud — ST passed (24/24 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement
+- ⚠ [Manual] 1 case requires manual visual verification: HUD pixel rendering (coin/heart icons, text outline, anchor ±2%, transparent background) — per ATS FR-016 visual-judgment requirement

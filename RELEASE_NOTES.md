@@ -14,6 +14,7 @@
 - Feature #7: Patrol Enemy — enemy that patrols between two waypoints at constant speed (reverses at endpoint ≤1 frame), stomp-kill from above with player bounce, side/below contact triggers death, 17/17 ST cases passing
 - Feature #8: Collectibles & Blocks — coin collection on player collision (deactivate + counter +1, reset on death), question blocks hit from below (loot table: Coin 70%/Super Mushroom 15%/Fire Flower 15%), power-ups (Super Mushroom bouncing + growth, Fire Flower static + fireball ability), fireball projectile (enemy elimination), 39/39 ST cases passing
 - Feature #11: 60fps Frame Rate (NFR-001) — built-in FPS counter with min/max/avg/p99 frame-time statistics and 60-second sliding window FPS validation, 17/17 ST cases passing
+- Feature #9: HUD — screen-space overlay rendering PlayerStats (coins, lives) at viewport (3%, 3%) with 1px black-outline pixel font, coin/heart icons (8x8px pixel art), instant frame update via IAPI-009, 24/24 ST cases passing
 
 ### Changed
 - (none yet)
