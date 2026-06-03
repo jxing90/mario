@@ -340,3 +340,16 @@
 #### Risks
 - ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement
 - ⚠ [Manual] 1 case requires manual visual verification: HUD pixel rendering (coin/heart icons, text outline, anchor ±2%, transparent background) — per ATS FR-016 visual-judgment requirement
+
+### Session 21 — Feature Design #10 (2026-06-03)
+
+- **Feature #10: Display Config** (FR-017) — 分辨率切换 + 全屏开关 + 选项菜单 UI
+- **SRS**: §FR-017 (lines 258-267)
+- **Design**: §2.10 (lines 295-312)
+- **UCD**: §3.12 Options Menu (lines 160-164)
+- **ATS**: FR-017 → FUNC,BNDRY,UI; Manual: visual-judgment
+- **env-guide §4**: greenfield — no codebase constraints
+- **UI**: true (ui_entry=/options-menu)
+- **Config Gate**: skipped (no required_configs)
+- Design: DONE (docs/features/10-display-config.md)
+- current.phase: design → tdd
