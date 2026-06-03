@@ -21,7 +21,7 @@ const DT: f32 = 1.0 / 60.0;
 const MAX_STEPS: u32 = 5;
 
 /// Supported display resolutions (FR-018, IAPI-011).
-const SUPPORTED_RESOLUTIONS: [(u32, u32); 3] = [
+pub const SUPPORTED_RESOLUTIONS: [(u32, u32); 3] = [
     (1280, 720),
     (1920, 1080),
     (2560, 1440),

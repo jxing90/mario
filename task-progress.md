@@ -387,3 +387,12 @@
 - current.phase: design → tdd
 
 - ⚠ [Manual] 2 manual test cases require visual verification: ST-UI-010-M01 (visual rendering completeness — 8 VRC elements, pixel-font clarity, semi-transparency effect) and ST-UI-010-M02 (interactive depth — real-time highlight sync, fullscreen toggle behavior, nearest-neighbor scaling confirmation) — per ATS FR-017 Manual: visual-judgment requirement
+
+### Session 24 — TDD #12 (2026-06-03)
+
+- **Feature #12: Multi-Resolution Display (NFR-002)** — 多分辨率校验工具 + 自动化测量断言
+- **Status**: failing
+- **Dependencies**: [1, 4, 9, 10]
+- TDD: green ✓ (R-G-R complete) — 22 tests, categories=FUNC/happy(8)+FUNC/error(3)+BNDRY/edge(6)+PERF(2)+UI(3), negative_ratio=0.409
+- Quality: line=85.96%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 NFR-002)
+- current.phase: tdd → st
