@@ -14,5 +14,6 @@ pub mod parallax;
 pub mod metrics;
 pub mod states;
 pub mod entities;
+pub mod palette;
 pub mod systems;
 pub mod verification;

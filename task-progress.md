@@ -422,3 +422,12 @@
 - **Config Gate**: skipped (no required_configs)
 - Design: DONE (docs/features/13-pixel-art-rendering-nfr-003.md)
 - current.phase: design → tdd
+
+### Session 26 — TDD #13 (2026-06-03)
+
+- **Feature #13: Pixel Art Rendering (NFR-003)** — 最近邻插值 + 像素坐标取整 + 调色板 ≤ 16 色
+- **Status**: failing
+- **Dependencies**: [2]
+- TDD: green ✓ (R-G-R complete) — 21 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+UI/palette+UI/filter+INTG/level, negative_ratio=0.43
+- Quality: line=86.26%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 NFR-003)
+- current.phase: tdd → st
