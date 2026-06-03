@@ -297,6 +297,17 @@
 - Design: DONE (docs/features/9-hud.md)
 - current.phase: design → tdd
 
+### Session 20 — TDD #9 (2026-06-03)
+
+- **Feature #9: HUD** (FR-016) — 金币/生命 HUD 叠加层渲染
+- **Status**: failing
+- **Dependencies**: [3, 6]
+- TDD: green ✓ (R-G-R complete) — 24 tests, categories=FUNC/happy(4)+FUNC/error(3)+BNDRY/edge(7)+INTG/api(2)+UI/render(7)+PERF/frame(1), negative_ratio=0.417
+- Quality Gates: PASS (line 89.20%, branch=N/A (MSVC tool limitation), srs_trace 1/1 covered)
+- current.phase: tdd → st
+
+---
+
 ### Session 18 — TDD #8 (2026-06-03)
 
 - **Feature #8: Collectibles & Blocks** (FR-008, FR-011) — 金币收集 + 问号方块 + 奖励道具
