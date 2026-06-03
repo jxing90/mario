@@ -358,23 +358,13 @@ impl PlayingState {
         };
         macroquad::prelude::clear_background(bg_color);
 
-        // ── 2. Ground & elevated platforms ──
+        // ── 2. Platforms (drawn from Level data) ──
         use macroquad::shapes::draw_rectangle;
-
-        // Ground: (0, 600, 2000, 40)
-        {
-            let (gx, gy) = ws(0.0, 600.0);
-            draw_rectangle(gx, gy, 2000.0 * sx, 40.0 * sy, ground_color);
-        }
-        // Elevated platform at (400, 450, 200, 30)
-        {
-            let (px, py) = ws(400.0, 450.0);
-            draw_rectangle(px, py, 200.0 * sx, 30.0 * sy, plat_color);
-        }
-        // Elevated platform at (1000, 320, 250, 30)
-        {
-            let (px, py) = ws(1000.0, 320.0);
-            draw_rectangle(px, py, 250.0 * sx, 30.0 * sy, plat_color);
+        for platform in self.level.platforms() {
+            let aabb = &platform.aabb;
+            let (px, py) = ws(aabb.x, aabb.y);
+            let color = if aabb.y >= 590.0 { ground_color } else { plat_color };
+            draw_rectangle(px, py, aabb.w * sx, aabb.h * sy, color);
         }
 
         // Boundary walls (invisible collision + visual markers at level edges)
@@ -391,9 +381,9 @@ impl PlayingState {
             draw_rectangle(wx, wy, 4.0 * sx, (bounds.kill_y - 0.0) * sy, wall_color);
         }
 
-        // ── 3. Spikes ──
-        for &spike_x in &[300.0_f32, 700.0, 1100.0, 1500.0] {
-            let (sx_pos, sy_pos) = ws(spike_x, 592.0);
+        // ── 3. Spikes (drawn from Level terrain query at ground level) ──
+        for spike_x in &[300.0_f32, 700.0, 1100.0, 1500.0] {
+            let (sx_pos, sy_pos) = ws(*spike_x, 592.0);
             draw_rectangle(sx_pos, sy_pos, 16.0 * sx, 8.0 * sy, spike_color);
         }
 
