@@ -260,3 +260,15 @@
 - TDD: green ✓ (R-G-R complete) — 17 tests, categories=FUNC/happy+FUNC/error+BNDRY/edge+BNDRY/null+INTG/physics+INTG/state, negative_ratio=47.1%
 - Quality: line=92.39%, branch=N/A (MSVC tool limitation), srs_trace_coverage=OK (1/1 FR-010)
 - current.phase: tdd → st
+
+---
+
+### Feature #7: Patrol Enemy — PASS
+- Completed: 2026-06-03
+- TDD: green ✓
+- Quality Gates: 92.39% line, branch=N/A (MSVC tool limitation)
+- Feature-ST: 17 cases, all PASS
+- Inline Check: PASS (P2: 6/6 methods, T2: 17/17 tests, D3: N/A, ATS Category: 2/2, §4: 0 files 0 violations)
+- Git: fb785ae feat: feature #7 patrol-enemy — ST passed (17/17 cases)
+#### Risks
+- ⚠ [Coverage] branch N/A — MSVC tool limitation blocked branch coverage measurement; verified manually via test case boundary/path analysis
