@@ -32,12 +32,28 @@ impl EditorState {
         if is_key_pressed(KeyCode::D) { self.tool = Tool::Drag; }
         if is_key_pressed(KeyCode::V) { self.tool = Tool::View; }
 
-        // Pan: arrow keys
-        let pan_speed = 400.0 * get_frame_time() / self.zoom;
-        if is_key_down(KeyCode::Left)  { self.cam_x -= pan_speed; }
-        if is_key_down(KeyCode::Right) { self.cam_x += pan_speed; }
-        if is_key_down(KeyCode::Up)    { self.cam_y -= pan_speed; }
-        if is_key_down(KeyCode::Down)  { self.cam_y += pan_speed; }
+        // Pan: arrow keys — nudge entity if selected, else pan canvas
+        if self.selected_entity.is_some() {
+            // Nudge selected entity by 1px
+            let mut dx = 0.0f32;
+            let mut dy = 0.0f32;
+            if is_key_pressed(KeyCode::Left)  { dx -= 1.0; }
+            if is_key_pressed(KeyCode::Right) { dx += 1.0; }
+            if is_key_pressed(KeyCode::Up)    { dy -= 1.0; }
+            if is_key_pressed(KeyCode::Down)  { dy += 1.0; }
+            if dx != 0.0 || dy != 0.0 {
+                let target = self.selected_entity.unwrap();
+                let (ex, ey) = self.entity_pos(target);
+                self.move_entity(target, ex + dx, ey + dy);
+                self.dirty = true;
+            }
+        } else {
+            let pan_speed = 400.0 * get_frame_time() / self.zoom;
+            if is_key_down(KeyCode::Left)  { self.cam_x -= pan_speed; }
+            if is_key_down(KeyCode::Right) { self.cam_x += pan_speed; }
+            if is_key_down(KeyCode::Up)    { self.cam_y -= pan_speed; }
+            if is_key_down(KeyCode::Down)  { self.cam_y += pan_speed; }
+        }
 
         // Zoom: +/- or mouse wheel
         if is_key_pressed(KeyCode::Equal) || is_key_pressed(KeyCode::KpAdd) { self.zoom = (self.zoom * 1.2).min(4.0); }
@@ -357,7 +373,16 @@ impl EditorState {
                         // Store offset so entity keeps its grab point during drag
                         let (ex, ey) = self.entity_pos(target);
                         self.drag_offset = (ex - wx, ey - wy);
+                        // Also select for property inspection
+                        self.selected_entity = Some(target);
+                        self.editing_field = None;
+                        self.edit_buf.clear();
                         self.set_status("Drag to move. Right-click or Esc to cancel.");
+                    } else {
+                        // Clicked empty space — deselect
+                        self.selected_entity = None;
+                        self.editing_field = None;
+                        self.edit_buf.clear();
                     }
                 } else if self.tool == Tool::View {
                     // View mode: select entity for property inspection
