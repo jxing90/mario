@@ -341,10 +341,13 @@ impl PlayingState {
                 }
                 let ba = brick.collider();
                 let block_bottom = ba.y + ba.h;
+                // Head must be AT or inside the block bottom (not below it).
+                // Directional check prevents activation when sliding down the side
+                // (head passes block_bottom from above → below).
                 if player_aabb.intersects(&ba)
-                    && (player_aabb.y - block_bottom).abs() <= 4.0
+                    && player_aabb.y >= block_bottom - 4.0
+                    && player_aabb.y <= block_bottom
                     && self.player.pos.y >= block_bottom
-                    && self.player.vel.y < 0.0 // must be jumping up (not falling past the side)
                 {
                     brick.shatter();
                     self.player.vel.y = 100.0;
@@ -353,8 +356,8 @@ impl PlayingState {
         }
 
         // Question blocks — only activate when hit from below.
-        // Player must be moving upward (vel.y < 0) to prevent activation
-        // when sliding down the side or falling past the block bottom.
+        // Directional head check: head must be at or inside the block bottom,
+        // not below it (prevents side-slide / fall-past activation).
         const HEAD_TOLERANCE: f32 = 4.0;
         let block_roll = self.next_rand();
         for block in self.question_blocks.iter_mut() {
@@ -362,9 +365,9 @@ impl PlayingState {
                 let ba = block.collider();
                 let block_bottom = ba.y + ba.h;
                 if player_aabb.intersects(&ba)
-                    && (player_aabb.y - block_bottom).abs() <= HEAD_TOLERANCE
+                    && player_aabb.y >= block_bottom - HEAD_TOLERANCE
+                    && player_aabb.y <= block_bottom
                     && self.player.pos.y >= block_bottom
-                    && self.player.vel.y < 0.0
                 {
                     block.used = true;
                     self.player.vel.y = 100.0;
