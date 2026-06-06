@@ -365,7 +365,15 @@ impl EditorState {
             let editing_this = self.editing_field.as_deref() == Some(*field_name);
 
             // Label
-            draw_text(&format!("{}:", label), panel_x + 6.0, row_y + prop_font, prop_font, Color::new(0.7, 0.7, 0.7, 1.0));
+            let label_text = format!("{}:", label);
+            let lw = measure_text(&label_text, None, 12, 1.0).width;
+            draw_text(&label_text, panel_x + 6.0, row_y + prop_font, prop_font, Color::new(0.7, 0.7, 0.7, 1.0));
+
+            // Tooltip on label hover
+            let (cmx, cmy) = mouse_position();
+            if cmx >= panel_x + 6.0 && cmx <= panel_x + 6.0 + lw && cmy >= row_y && cmy <= row_y + row_h {
+                draw_property_tooltip(cmx, cmy, *field_name);
+            }
 
             // Value (or edit buffer)
             let val_x = panel_x + panel_w - 6.0;
@@ -413,5 +421,34 @@ impl EditorState {
             crate::editor::tool::DragTarget::PlayerSpawn => "Player Spawn".into(),
             crate::editor::tool::DragTarget::Flagpole => "Flagpole".into(),
         }
+    }
+}
+
+fn draw_property_tooltip(mx: f32, my: f32, field_name: &str) {
+    let tip = property_tooltip_text(field_name);
+    if tip.is_empty() { return; }
+    let font = 13.0;
+    let tw = measure_text(tip, None, 12, 1.0).width + 12.0;
+    let th = 20.0;
+    let tx = (mx + 16.0).min(macroquad::prelude::screen_width() - tw - 10.0);
+    let ty = my + 16.0;
+    draw_rectangle(tx, ty, tw, th, Color::new(0.05, 0.05, 0.12, 0.92));
+    draw_rectangle_lines(tx, ty, tw, th, 1.0, Color::new(0.4, 0.4, 0.5, 0.8));
+    draw_text(tip, tx + 6.0, ty + th - 4.0, font, Color::new(0.9, 0.9, 1.0, 1.0));
+}
+
+fn property_tooltip_text(field: &str) -> &'static str {
+    match field {
+        "x" => "水平坐标 (X轴位置)",
+        "y" => "垂直坐标 (Y轴位置)",
+        "w" => "宽度 (水平方向尺寸)",
+        "h" => "高度 (垂直方向尺寸)",
+        "top_y" => "顶部Y坐标 (震荡范围上限)",
+        "bottom_y" => "底部Y坐标 (震荡范围下限)",
+        "wax" => "巡逻点A的X坐标",
+        "way" => "巡逻点A的Y坐标",
+        "wbx" => "巡逻点B的X坐标",
+        "wby" => "巡逻点B的Y坐标",
+        _ => "",
     }
 }
