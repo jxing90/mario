@@ -5,6 +5,7 @@
 // See src/editor/mod.rs for the editor implementation.
 
 use mario_platformer::editor::EditorState;
+use mario_platformer::editor::render::init_cjk_font;
 use macroquad::prelude::*;
 
 fn window_conf() -> macroquad::window::Conf {
@@ -19,6 +20,11 @@ fn window_conf() -> macroquad::window::Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    // Try loading a CJK-capable font for Chinese tooltips.
+    // On Windows, try Microsoft YaHei; fall back gracefully.
+    let cjk = macroquad::text::load_ttf_font("C:/Windows/Fonts/msyh.ttc").await.ok();
+    init_cjk_font(cjk);
+
     let mut editor = EditorState::new();
 
     loop {

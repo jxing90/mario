@@ -427,14 +427,25 @@ impl EditorState {
 fn draw_property_tooltip(mx: f32, my: f32, field_name: &str) {
     let tip = property_tooltip_text(field_name);
     if tip.is_empty() { return; }
-    let font = 13.0;
+    let font_size = 13.0;
     let tw = measure_text(tip, None, 12, 1.0).width + 12.0;
     let th = 20.0;
     let tx = (mx + 16.0).min(macroquad::prelude::screen_width() - tw - 10.0);
     let ty = my + 16.0;
     draw_rectangle(tx, ty, tw, th, Color::new(0.05, 0.05, 0.12, 0.92));
     draw_rectangle_lines(tx, ty, tw, th, 1.0, Color::new(0.4, 0.4, 0.5, 0.8));
-    draw_text(tip, tx + 6.0, ty + th - 4.0, font, Color::new(0.9, 0.9, 1.0, 1.0));
+    // Use CJK font if available, otherwise default font (will be garbled)
+    if let Some(font) = cjk_font() {
+        let params = macroquad::text::TextParams {
+            font: Some(font),
+            font_size: font_size as u16,
+            color: Color::new(0.9, 0.9, 1.0, 1.0),
+            ..Default::default()
+        };
+        macroquad::text::draw_text_ex(tip, tx + 6.0, ty + th - 4.0, params);
+    } else {
+        draw_text(tip, tx + 6.0, ty + th - 4.0, font_size, Color::new(0.9, 0.9, 1.0, 1.0));
+    }
 }
 
 fn property_tooltip_text(field: &str) -> &'static str {
@@ -451,4 +462,18 @@ fn property_tooltip_text(field: &str) -> &'static str {
         "wby" => "巡逻点B的Y坐标",
         _ => "",
     }
+}
+
+// ── CJK font for Chinese tooltips ──
+
+use std::sync::OnceLock;
+static CJK_FONT: OnceLock<Option<macroquad::text::Font>> = OnceLock::new();
+
+/// Call once at startup to load a Chinese-capable font.
+pub fn init_cjk_font(font: Option<macroquad::text::Font>) {
+    CJK_FONT.set(font).ok();
+}
+
+fn cjk_font() -> Option<&'static macroquad::text::Font> {
+    CJK_FONT.get().and_then(|f| f.as_ref())
 }

@@ -12,6 +12,6 @@ mod data;
 mod tool;
 pub(crate) mod state;
 mod update;
-mod render;
+pub mod render;
 
 pub use state::EditorState;
