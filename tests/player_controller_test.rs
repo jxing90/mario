@@ -1130,10 +1130,10 @@ fn t20_collider_size_changes_with_powerup_state_foot_aligned() {
     player.state = PlayerState::Super;
     let super_collider = player.collider();
 
-    // Super: 32x32 (w and h both doubled).
+    // Super: 16x32 (width stays Small, height doubles).
     assert!(
-        approx_eq(super_collider.w, 32.0),
-        "T20: Super collider width must be 32. Got {}.",
+        approx_eq(super_collider.w, 16.0),
+        "T20: Super collider width must be 16 (same as Small). Got {}.",
         super_collider.w
     );
     assert!(
@@ -1340,11 +1340,11 @@ fn t25_apply_powerup_small_to_super() {
         player.state
     );
 
-    // Collider must update to 32x32.
+    // Collider must update to 16x32 (width stays Small, height doubles).
     let c = player.collider();
     assert!(
-        approx_eq(c.w, 32.0) && approx_eq(c.h, 32.0),
-        "T25: After powerup, collider must be 32x32. Got {}x{}.",
+        approx_eq(c.w, 16.0) && approx_eq(c.h, 32.0),
+        "T25: After powerup, collider must be 16x32. Got {}x{}.",
         c.w, c.h
     );
 
@@ -1793,27 +1793,27 @@ fn t36_collider_matches_render_size_all_states() {
     assert!(approx_eq(c.h, 16.0), "T36: Small h must be 16. Got {}", c.h);
     assert!(approx_eq(c.x + c.w / 2.0, player.pos.x), "T36: Small center != pos.x");
 
-    // Super: 32x32
+    // Super: 16x32 (width stays Small, height doubles)
     player.state = PlayerState::Super;
     player.crouching = false;
     let c = player.collider();
-    assert!(approx_eq(c.w, 32.0), "T36: Super w must be 32. Got {}", c.w);
+    assert!(approx_eq(c.w, 16.0), "T36: Super w must be 16. Got {}", c.w);
     assert!(approx_eq(c.h, 32.0), "T36: Super h must be 32. Got {}", c.h);
     assert!(approx_eq(c.x + c.w / 2.0, player.pos.x), "T36: Super center != pos.x");
 
-    // Crouching: 32x16
+    // Crouching: 16x16 (width stays 16, height halves)
     player.state = PlayerState::Super;
     player.crouching = true;
     let c = player.collider();
-    assert!(approx_eq(c.w, 32.0), "T36: Crouch w must stay 32. Got {}", c.w);
+    assert!(approx_eq(c.w, 16.0), "T36: Crouch w must be 16. Got {}", c.w);
     assert!(approx_eq(c.h, 16.0), "T36: Crouch h must be 16. Got {}", c.h);
     assert!(approx_eq(c.x + c.w / 2.0, player.pos.x), "T36: Crouch center != pos.x");
 
-    // Fire: 32x32
+    // Fire: 16x32 (same as Super)
     player.state = PlayerState::Fire;
     player.crouching = false;
     let c = player.collider();
-    assert!(approx_eq(c.w, 32.0), "T36: Fire w must be 32. Got {}", c.w);
+    assert!(approx_eq(c.w, 16.0), "T36: Fire w must be 16. Got {}", c.w);
     assert!(approx_eq(c.h, 32.0), "T36: Fire h must be 32. Got {}", c.h);
 
     // Damage: back to 16x16

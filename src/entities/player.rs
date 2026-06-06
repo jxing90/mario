@@ -494,7 +494,8 @@ impl Player {
     fn collider_width(&self) -> f32 {
         match self.state {
             PlayerState::Small => 16.0,
-            PlayerState::Super | PlayerState::Fire => 32.0,
+            // Keep Small width when powered up; only height increases
+            PlayerState::Super | PlayerState::Fire => 16.0,
         }
     }
 
