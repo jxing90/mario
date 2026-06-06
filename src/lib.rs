@@ -7,6 +7,7 @@
 pub mod engine;
 pub mod state;
 pub mod input;
+pub mod audio;
 pub mod assets;
 pub mod level;
 pub mod parallax;

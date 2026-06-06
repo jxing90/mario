@@ -4,6 +4,7 @@
 // The primary gameplay state. Manages player physics, hazard/flagpole/checkpoint
 // detection, invulnerability timers, and triggers transitions to Dead/Victory.
 
+use crate::audio::SoundManager;
 use crate::entities::coin::Coin;
 use crate::entities::dart::Dart;
 use crate::entities::dart_enemy::DartEnemy;
@@ -80,6 +81,8 @@ pub struct PlayingState {
     level_bounds: LevelBounds,
     /// Xorshift64 RNG state for question block loot randomization.
     rng_state: u64,
+    /// Sound effects manager (None during tests — no audio backend).
+    pub sfx: Option<SoundManager>,
 }
 
 impl PlayingState {
@@ -178,6 +181,7 @@ impl PlayingState {
             current_level: level_num,
             level_bounds: bounds,
             rng_state: Self::seed_rng(),
+            sfx: None,
         }
     }
 
@@ -199,6 +203,13 @@ impl PlayingState {
         (x as f64 / u64::MAX as f64) as f32
     }
 
+    /// Play a sound effect if the sound manager is initialized.
+    fn sfx(&mut self, play: fn(&mut SoundManager)) {
+        if let Some(ref mut s) = self.sfx {
+            play(s);
+        }
+    }
+
     /// Advance the simulation by one fixed timestep.
     ///
     /// Runs: invuln countdown → enemy patrol → player physics → hazard check → enemy check
@@ -208,11 +219,17 @@ impl PlayingState {
     pub fn update(&mut self, dt: f32) -> Option<GameState> {
         self.frame_count = self.frame_count.wrapping_add(1);
 
+        // Lazy-init sound effects on first real frame (requires audio backend)
+        if self.screen_w > 0.0 && self.sfx.is_none() {
+            self.sfx = Some(SoundManager::new());
+        }
+
         // 0. Countdown timer — death when time runs out
         self.time_remaining -= dt;
         if self.time_remaining <= 0.0 {
             self.time_remaining = 0.0;
             self.player.lives = 0;
+            self.sfx(SoundManager::play_gameover);
             return Some(GameState::GameOver(GameOverState::new(
                 self.player.coins, self.current_level,
             )));
@@ -239,6 +256,7 @@ impl PlayingState {
         if self.flagpole.phase == FlagpolePhase::Sliding {
             self.flagpole.update(dt);
             if self.flagpole.phase == FlagpolePhase::Done {
+                self.sfx(SoundManager::play_victory);
                 return Some(GameState::Victory(VictoryState::new(
                     self.player.coins, self.player.lives,
                     self.player.state, self.current_level,
@@ -315,6 +333,7 @@ impl PlayingState {
         // 3f. Dart enemy update + shooting
         let player_x = self.player.pos().x;
         let player_y = self.player.pos().y;
+        let mut dart_fired = false;
         for de in self.dart_enemies.iter_mut() {
             let shoot_now = de.update(dt, player_x);
             if shoot_now {
@@ -322,7 +341,11 @@ impl PlayingState {
                 let target = Vec2 { x: player_x, y: player_y };
                 let spawn = de.spawn_pos();
                 self.darts.push(Dart::new(spawn, target));
+                dart_fired = true;
             }
+        }
+        if dart_fired {
+            self.sfx(SoundManager::play_fireball);
         }
 
         // 3g. Dart update + terrain collision (darts die on platform contact)
@@ -395,19 +418,29 @@ impl PlayingState {
         } else {
             crate::input::InputState::default()
         };
+        // Jump sound on rising edge
+        if input.jump_just {
+            self.sfx(SoundManager::play_jump);
+        }
         // 4a. Hit detection: check block/brick/coin overlap BEFORE terrain
         // collision resolves and pushes the player away.
         let player_aabb = self.player.collider();
 
         // Coins
+        let mut coin_collected = false;
         for coin in self.coins.iter_mut() {
             if !coin.collected && player_aabb.intersects(&coin.collider()) {
                 coin.collected = true;
                 self.player.coins += 1;
+                coin_collected = true;
             }
+        }
+        if coin_collected {
+            self.sfx(SoundManager::play_coin);
         }
 
         // Breakable bricks (Super/Fire only, must be hit from below)
+        let mut brick_hit = false;
         if !matches!(self.player.state, crate::entities::player::PlayerState::Small) {
             for brick in self.bricks.iter_mut() {
                 if brick.broken {
@@ -415,10 +448,6 @@ impl PlayingState {
                 }
                 let ba = brick.collider();
                 let block_bottom = ba.y + ba.h;
-                // Head must be AT or inside the block bottom (not below it).
-                // Player center X must be within the block's horizontal extent
-                // (prevents activation when sliding down the side, where the
-                // player's center is outside the block but the collider overlaps).
                 if player_aabb.intersects(&ba)
                     && player_aabb.y >= block_bottom - 4.0
                     && player_aabb.y <= block_bottom
@@ -428,15 +457,18 @@ impl PlayingState {
                 {
                     brick.shatter();
                     self.player.vel.y = 100.0;
+                    brick_hit = true;
                 }
             }
         }
+        if brick_hit {
+            self.sfx(SoundManager::play_bump);
+        }
 
         // Question blocks — only activate when hit from below.
-        // Directional head check + player center must be within block X range
-        // to prevent side-slide activation.
         const HEAD_TOLERANCE: f32 = 4.0;
         let block_roll = self.next_rand();
+        let mut block_hit = false;
         for block in self.question_blocks.iter_mut() {
             if !block.used {
                 let ba = block.collider();
@@ -450,6 +482,7 @@ impl PlayingState {
                 {
                     block.used = true;
                     self.player.vel.y = 100.0;
+                    block_hit = true;
                     // Random roll from xorshift64 RNG (pre-generated before loop)
                     let roll = block_roll;
                     if roll < 0.60 {
@@ -474,6 +507,9 @@ impl PlayingState {
                 }
             }
         }
+        if block_hit {
+            self.sfx(SoundManager::play_bump);
+        }
 
         // 4b. Apply player physics AFTER hit detection (so blocks can be hit
         // before terrain collision pushes the player away).
@@ -487,6 +523,7 @@ impl PlayingState {
             // take_damage(): true = fatal (Small dies), false = downgrade (Super/Fire → Small)
             let fatal = self.player.take_damage();
             if fatal {
+                self.sfx(SoundManager::play_death);
                 self.player.lives -= 1;
                 return Some(GameState::Dead(DeadState::new(
                     self.player.lives,
@@ -498,6 +535,7 @@ impl PlayingState {
                     self.screen_h,
                 )));
             }
+            self.sfx(SoundManager::play_damage);
             self.invuln_timer = 2.0; // ~2s invulnerability window
         }
 
@@ -567,6 +605,7 @@ impl PlayingState {
                 CollisionEvent::EnemyStomp(i) => {
                     self.enemies[i].alive = false;
                     self.player.vel.y = self.enemies[i].config.bounce_velocity;
+                    self.sfx(SoundManager::play_stomp);
                 }
                 CollisionEvent::EnemyContact(_)
                     if self.invuln_timer <= 0.0 && self.player.star_timer <= 0.0 && self.player.lives > 0 =>
@@ -574,6 +613,7 @@ impl PlayingState {
                     // take_damage(): true = fatal (Small dies), false = downgrade
                     let fatal = self.player.take_damage();
                     if fatal {
+                        self.sfx(SoundManager::play_death);
                         self.player.lives -= 1;
                         return Some(GameState::Dead(DeadState::new(
                             self.player.lives,
@@ -594,9 +634,12 @@ impl PlayingState {
         // 7b. PowerUp collection: check player overlap with each power-up
         let player_col = self.player.collider();
         let mut collected_indices: Vec<usize> = Vec::new();
+        let mut powerup_collected = false;
+        let mut oneup_collected = false;
         for (i, pu) in self.power_ups.iter().enumerate() {
             if player_col.intersects(&pu.collider()) {
                 collected_indices.push(i);
+                powerup_collected = true;
                 match pu.kind {
                     PowerUpKind::SuperMushroom => {
                         self.player.apply_powerup(crate::entities::player::PlayerState::Super);
@@ -608,11 +651,18 @@ impl PlayingState {
                         self.player.activate_star();
                     }
                     PowerUpKind::OneUpMushroom => {
+                        oneup_collected = true;
                         self.player.lives += 1;
                     }
                     PowerUpKind::Coin => {} // coins are handled separately
                 }
             }
+        }
+        if powerup_collected {
+            self.sfx(SoundManager::play_powerup);
+        }
+        if oneup_collected {
+            self.sfx(SoundManager::play_oneup);
         }
         // Remove collected power-ups (reverse order to preserve indices)
         for i in collected_indices.into_iter().rev() {
