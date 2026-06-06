@@ -65,6 +65,10 @@ struct JsonLevel {
     #[serde(default)]
     enemies: Vec<JsonEnemy>,
     #[serde(default)]
+    dart_enemies: Vec<JsonDartEnemy>,
+    #[serde(default)]
+    osc_fireballs: Vec<JsonOscFireball>,
+    #[serde(default)]
     checkpoints: Vec<JsonPos>,
     flagpole: JsonPos,
     #[serde(default = "default_parallax")]
@@ -83,6 +87,12 @@ struct JsonPos { x: f32, y: f32 }
 #[derive(Deserialize)]
 struct JsonEnemy { x: f32, y: f32, waypoint_a: JsonPos, waypoint_b: JsonPos }
 
+#[derive(Deserialize)]
+struct JsonDartEnemy { x: f32, y: f32 }
+
+#[derive(Deserialize)]
+struct JsonOscFireball { x: f32, top_y: f32, bottom_y: f32 }
+
 fn default_parallax() -> Vec<f32> { vec![0.1, 0.3, 0.6] }
 
 // ============================================================================
@@ -100,6 +110,12 @@ pub struct BrickSpawn { pub pos: Vec2 }
 
 #[derive(Debug, Clone)]
 pub struct EnemySpawn { pub pos: Vec2, pub waypoint_a: Vec2, pub waypoint_b: Vec2 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct DartEnemySpawn { pub x: f32, pub y: f32 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct OscFireballSpawn { pub x: f32, pub top_y: f32, pub bottom_y: f32 }
 
 #[derive(Debug, Clone)]
 pub struct CheckpointSpawn { pub pos: Vec2 }
@@ -121,6 +137,8 @@ pub struct Level {
     pub block_spawns: Vec<QuestionBlockSpawn>,
     pub brick_spawns: Vec<BrickSpawn>,
     pub enemy_spawns: Vec<EnemySpawn>,
+    pub dart_enemy_spawns: Vec<DartEnemySpawn>,
+    pub osc_fireball_spawns: Vec<OscFireballSpawn>,
     pub checkpoint_spawns: Vec<CheckpointSpawn>,
     pub flagpole_spawn: FlagpoleSpawn,
 }
@@ -177,6 +195,12 @@ impl Level {
             waypoint_b: Vec2 { x: e.waypoint_b.x, y: e.waypoint_b.y },
         }).collect();
 
+        let dart_enemy_spawns: Vec<DartEnemySpawn> = data.dart_enemies.iter()
+            .map(|d| DartEnemySpawn { x: d.x, y: d.y }).collect();
+
+        let osc_fireball_spawns: Vec<OscFireballSpawn> = data.osc_fireballs.iter()
+            .map(|o| OscFireballSpawn { x: o.x, top_y: o.top_y, bottom_y: o.bottom_y }).collect();
+
         let checkpoint_spawns: Vec<CheckpointSpawn> = data.checkpoints.iter()
             .map(|c| CheckpointSpawn { pos: Vec2 { x: c.x, y: c.y } }).collect();
 
@@ -185,7 +209,9 @@ impl Level {
         };
 
         Level { platforms, spikes, bounds, parallax_layers,
-            coin_spawns, block_spawns, brick_spawns, enemy_spawns, checkpoint_spawns, flagpole_spawn }
+            coin_spawns, block_spawns, brick_spawns, enemy_spawns,
+            dart_enemy_spawns, osc_fireball_spawns,
+            checkpoint_spawns, flagpole_spawn }
     }
 
     pub fn platforms(&self) -> &[Platform] { &self.platforms }

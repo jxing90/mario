@@ -5,9 +5,12 @@
 // detection, invulnerability timers, and triggers transitions to Dead/Victory.
 
 use crate::entities::coin::Coin;
+use crate::entities::dart::Dart;
+use crate::entities::dart_enemy::DartEnemy;
 use crate::entities::enemy::{Enemy, EnemyConfig};
-use crate::entities::player::Player;
 use crate::entities::fireball::Fireball;
+use crate::entities::osc_fireball::OscFireball;
+use crate::entities::player::Player;
 use crate::entities::flagpole::{Flagpole, FlagpolePhase};
 use crate::entities::brick::Brick;
 use crate::entities::checkpoint::Checkpoint;
@@ -48,6 +51,12 @@ pub struct PlayingState {
     pub fireballs: Vec<Fireball>,
     /// Fireball cooldown timer (seconds until next shot allowed).
     fireball_cooldown: f32,
+    /// Dart-throwing enemies (stationary turrets).
+    pub dart_enemies: Vec<DartEnemy>,
+    /// Active dart projectiles thrown by dart enemies.
+    pub darts: Vec<Dart>,
+    /// Oscillating fireball hazards (vertical movement).
+    pub osc_fireballs: Vec<OscFireball>,
     /// Breakable bricks: when hit from below by Super/Fire Mario, they shatter.
     pub bricks: Vec<Brick>,
     /// Spawn positions for brick reset on death (bricks are restored).
@@ -128,6 +137,16 @@ impl PlayingState {
             ))
             .collect();
 
+        // Spawn dart enemies from level config
+        let dart_enemies: Vec<DartEnemy> = level.dart_enemy_spawns.iter()
+            .map(|d| DartEnemy::new(Vec2 { x: d.x, y: d.y }))
+            .collect();
+
+        // Spawn oscillating fireballs from level config
+        let osc_fireballs: Vec<OscFireball> = level.osc_fireball_spawns.iter()
+            .map(|o| OscFireball::new(o.x, o.top_y, o.bottom_y))
+            .collect();
+
         Self {
             player,
             level,
@@ -141,6 +160,9 @@ impl PlayingState {
             power_ups: Vec::new(),
             fireballs: Vec::new(),
             fireball_cooldown: 0.0,
+            dart_enemies,
+            darts: Vec::new(),
+            osc_fireballs,
             bricks,
             brick_spawns,
             invuln_timer: 0.0,
@@ -290,6 +312,58 @@ impl PlayingState {
         // Clean up dead fireballs
         self.fireballs.retain(|fb| fb.alive);
 
+        // 3f. Dart enemy update + shooting
+        let player_x = self.player.pos().x;
+        let player_y = self.player.pos().y;
+        for de in self.dart_enemies.iter_mut() {
+            let shoot_now = de.update(dt, player_x);
+            if shoot_now {
+                // Spawn a dart from the enemy toward the player's current position
+                let target = Vec2 { x: player_x, y: player_y };
+                let spawn = de.spawn_pos();
+                self.darts.push(Dart::new(spawn, target));
+            }
+        }
+
+        // 3g. Dart update + terrain collision (darts die on platform contact)
+        let dart_terrain: Vec<crate::level::Tile> = self.level.platforms()
+            .iter()
+            .map(|p| crate::level::Tile::Platform(p.aabb))
+            .collect();
+        for dart in self.darts.iter_mut() {
+            if !dart.alive { continue; }
+            dart.update(dt);
+            // Check terrain collision
+            for tile in &dart_terrain {
+                if let crate::level::Tile::Platform(p) = tile {
+                    if dart.collider().intersects(p) {
+                        dart.kill();
+                        break;
+                    }
+                }
+            }
+        }
+        // Clean up dead darts
+        self.darts.retain(|d| d.alive);
+
+        // 3h. Oscillating fireball update
+        for ofb in self.osc_fireballs.iter_mut() {
+            ofb.update(dt);
+        }
+
+        // 3i. Fireball vs osc-fireball: player fireballs can destroy them
+        for fb in self.fireballs.iter_mut() {
+            if !fb.alive { continue; }
+            for ofb in self.osc_fireballs.iter_mut() {
+                if !ofb.alive { continue; }
+                if fb.collider().intersects(&ofb.collider()) {
+                    fb.kill();
+                    ofb.kill();
+                    break;
+                }
+            }
+        }
+
         // 4. Update player physics with real keyboard input at runtime.
         // During tests (screen_w == 0.0), use default (no input) to avoid
         // panicking in Macroquad's is_key_down() which requires a GL context.
@@ -425,6 +499,63 @@ impl PlayingState {
                 )));
             }
             self.invuln_timer = 2.0; // ~2s invulnerability window
+        }
+
+        // 5a. Dart-player collision check
+        {
+            let player_col = self.player.collider();
+            for dart in self.darts.iter_mut() {
+                if !dart.alive { continue; }
+                if player_col.intersects(&dart.collider())
+                    && self.invuln_timer <= 0.0
+                    && self.player.star_timer <= 0.0
+                    && self.player.lives > 0
+                {
+                    dart.kill();
+                    let fatal = self.player.take_damage();
+                    if fatal {
+                        self.player.lives -= 1;
+                        return Some(GameState::Dead(DeadState::new(
+                            self.player.lives,
+                            self.player.coins,
+                            self.current_level,
+                            self.life_state.checkpoint,
+                            self.player.pos(),
+                            self.screen_w,
+                            self.screen_h,
+                        )));
+                    }
+                    self.invuln_timer = 2.0;
+                }
+            }
+        }
+
+        // 5b. Oscillating fireball-player collision check
+        {
+            let player_col = self.player.collider();
+            for ofb in self.osc_fireballs.iter() {
+                if !ofb.alive { continue; }
+                if player_col.intersects(&ofb.collider())
+                    && self.invuln_timer <= 0.0
+                    && self.player.star_timer <= 0.0
+                    && self.player.lives > 0
+                {
+                    let fatal = self.player.take_damage();
+                    if fatal {
+                        self.player.lives -= 1;
+                        return Some(GameState::Dead(DeadState::new(
+                            self.player.lives,
+                            self.player.coins,
+                            self.current_level,
+                            self.life_state.checkpoint,
+                            self.player.pos(),
+                            self.screen_w,
+                            self.screen_h,
+                        )));
+                    }
+                    self.invuln_timer = 2.0;
+                }
+            }
         }
 
         // 6. Enemy collision detection (Step D: enemy_check)
@@ -705,6 +836,11 @@ impl PlayingState {
             enemy.draw(sx, sy, &ws);
         }
 
+        // ── 8d. Dart enemies (turrets) ──
+        for de in &self.dart_enemies {
+            de.draw(sx, sy, &ws);
+        }
+
         // ── 8b. Power-ups ──
         for pu in &self.power_ups {
             pu.draw(sx, sy, &ws);
@@ -713,6 +849,16 @@ impl PlayingState {
         // ── 8c. Fireballs ──
         for fb in &self.fireballs {
             fb.draw(sx, sy, &ws);
+        }
+
+        // ── 8e. Darts (thrown projectiles) ──
+        for dart in &self.darts {
+            dart.draw(sx, sy, &ws);
+        }
+
+        // ── 8f. Oscillating fireballs ──
+        for ofb in &self.osc_fireballs {
+            ofb.draw(sx, sy, &ws);
         }
 
         // ── 9. Player (Mario) ──

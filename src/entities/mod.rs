@@ -8,4 +8,7 @@ pub mod question_block;
 pub mod brick;
 pub mod power_up;
 pub mod fireball;
+pub mod dart;
+pub mod dart_enemy;
+pub mod osc_fireball;
 pub mod loot_table;
