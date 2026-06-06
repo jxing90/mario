@@ -37,6 +37,12 @@ pub struct EditorState {
     pub(crate) menu_hdr_rects: Vec<(f32, f32, f32, f32)>,
     pub(crate) menu_item_rects: Vec<(f32, f32, f32, f32)>,
     pub(crate) prev_mouse: (f32, f32),
+    /// Selected entity for property inspection (View mode).
+    pub(crate) selected_entity: Option<DragTarget>,
+    /// Name of the field currently being edited, e.g. "x", "w", "top_y".
+    pub(crate) editing_field: Option<String>,
+    /// Text buffer for the field being edited.
+    pub(crate) edit_buf: String,
 }
 
 impl EditorState {
@@ -74,6 +80,9 @@ impl Default for EditorState {
             menu_hdr_rects: Vec::new(),
             menu_item_rects: Vec::new(),
             prev_mouse: (0.0, 0.0),
+            selected_entity: None,
+            editing_field: None,
+            edit_buf: String::new(),
         }
     }
 }
@@ -296,6 +305,100 @@ impl EditorState {
         }
     }
 
+    // ── Property inspector (View mode) ──
+
+    /// Returns (label, field_name, current_value) tuples for the selected entity.
+    pub(crate) fn entity_properties(&self) -> Vec<(&str, &str, f32)> {
+        let target = match &self.selected_entity { Some(t) => t, None => return vec![] };
+        match target {
+            DragTarget::Platform(i) => self.data.platforms.get(*i).map(|p| vec![
+                ("x", "x", p.x), ("y", "y", p.y), ("w", "w", p.w), ("h", "h", p.h),
+            ]).unwrap_or_default(),
+            DragTarget::Spike(i) => self.data.spikes.get(*i).map(|s| vec![
+                ("x", "x", s.x), ("y", "y", s.y),
+            ]).unwrap_or_default(),
+            DragTarget::Coin(i) => self.data.coins.get(*i).map(|c| vec![
+                ("x", "x", c.x), ("y", "y", c.y),
+            ]).unwrap_or_default(),
+            DragTarget::QuestionBlock(i) => self.data.question_blocks.get(*i).map(|q| vec![
+                ("x", "x", q.x), ("y", "y", q.y),
+            ]).unwrap_or_default(),
+            DragTarget::Brick(i) => self.data.bricks.get(*i).map(|b| vec![
+                ("x", "x", b.x), ("y", "y", b.y),
+            ]).unwrap_or_default(),
+            DragTarget::Enemy(i) => self.data.enemies.get(*i).map(|e| vec![
+                ("x", "x", e.x), ("y", "y", e.y),
+                ("way_a.x", "wax", e.waypoint_a.x), ("way_a.y", "way", e.waypoint_a.y),
+                ("way_b.x", "wbx", e.waypoint_b.x), ("way_b.y", "wby", e.waypoint_b.y),
+            ]).unwrap_or_default(),
+            DragTarget::DartEnemy(i) => self.data.dart_enemies.get(*i).map(|d| vec![
+                ("x", "x", d.x), ("y", "y", d.y),
+            ]).unwrap_or_default(),
+            DragTarget::OscFireball(i) => self.data.osc_fireballs.get(*i).map(|o| vec![
+                ("x", "x", o.x), ("top_y", "top_y", o.top_y), ("bottom_y", "bottom_y", o.bottom_y),
+            ]).unwrap_or_default(),
+            DragTarget::Checkpoint(i) => self.data.checkpoints.get(*i).map(|c| vec![
+                ("x", "x", c.x), ("y", "y", c.y),
+            ]).unwrap_or_default(),
+            DragTarget::PlayerSpawn => vec![
+                ("x", "x", self.data.player_spawn.x), ("y", "y", self.data.player_spawn.y),
+            ],
+            DragTarget::Flagpole => vec![
+                ("x", "x", self.data.flagpole.x), ("y", "y", self.data.flagpole.y),
+            ],
+        }
+    }
+
+    /// Set a property on the selected entity. Returns true if successful.
+    pub(crate) fn set_entity_property(&mut self, field_name: &str, value: f32) -> bool {
+        let target = match &self.selected_entity { Some(t) => t, None => return false };
+        let ok = match target {
+            DragTarget::Platform(i) => self.data.platforms.get_mut(*i).map(|p| match field_name {
+                "x" => { p.x = value; true } "y" => { p.y = value; true }
+                "w" => { p.w = value.max(16.0); true } "h" => { p.h = value.max(16.0); true }
+                _ => false,
+            }).unwrap_or(false),
+            DragTarget::Spike(i) => self.data.spikes.get_mut(*i).map(|s| match field_name {
+                "x" => { s.x = value; true } "y" => { s.y = value; true } _ => false,
+            }).unwrap_or(false),
+            DragTarget::Coin(i) => self.data.coins.get_mut(*i).map(|c| match field_name {
+                "x" => { c.x = value; true } "y" => { c.y = value; true } _ => false,
+            }).unwrap_or(false),
+            DragTarget::QuestionBlock(i) => self.data.question_blocks.get_mut(*i).map(|q| match field_name {
+                "x" => { q.x = value; true } "y" => { q.y = value; true } _ => false,
+            }).unwrap_or(false),
+            DragTarget::Brick(i) => self.data.bricks.get_mut(*i).map(|b| match field_name {
+                "x" => { b.x = value; true } "y" => { b.y = value; true } _ => false,
+            }).unwrap_or(false),
+            DragTarget::Enemy(i) => self.data.enemies.get_mut(*i).map(|e| match field_name {
+                "x" => { e.x = value; true } "y" => { e.y = value; true }
+                "wax" => { e.waypoint_a.x = value; true } "way" => { e.waypoint_a.y = value; true }
+                "wbx" => { e.waypoint_b.x = value; true } "wby" => { e.waypoint_b.y = value; true }
+                _ => false,
+            }).unwrap_or(false),
+            DragTarget::DartEnemy(i) => self.data.dart_enemies.get_mut(*i).map(|d| match field_name {
+                "x" => { d.x = value; true } "y" => { d.y = value; true } _ => false,
+            }).unwrap_or(false),
+            DragTarget::OscFireball(i) => self.data.osc_fireballs.get_mut(*i).map(|o| match field_name {
+                "x" => { o.x = value; true } "top_y" => { o.top_y = value; true }
+                "bottom_y" => { o.bottom_y = value; true } _ => false,
+            }).unwrap_or(false),
+            DragTarget::Checkpoint(i) => self.data.checkpoints.get_mut(*i).map(|c| match field_name {
+                "x" => { c.x = value; true } "y" => { c.y = value; true } _ => false,
+            }).unwrap_or(false),
+            DragTarget::PlayerSpawn => match field_name {
+                "x" => { self.data.player_spawn.x = value; true }
+                "y" => { self.data.player_spawn.y = value; true } _ => false,
+            },
+            DragTarget::Flagpole => match field_name {
+                "x" => { self.data.flagpole.x = value; true }
+                "y" => { self.data.flagpole.y = value; true } _ => false,
+            },
+        };
+        if ok { self.dirty = true; }
+        ok
+    }
+
     // ── Menu actions ──
     pub(crate) fn menu_action(&mut self, action: &str) {
         match action {
@@ -359,7 +462,7 @@ mod tests {
         assert_eq!(e.level_num, 1);
         assert_eq!(e.zoom, 1.0);
         assert!(e.grid_snap);
-        assert_eq!(e.tool, Tool::Platform);
+        assert_eq!(e.tool, Tool::View);
         assert!(!e.dirty);
     }
 

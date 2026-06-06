@@ -320,5 +320,98 @@ impl EditorState {
             let coord_text = format!("{:.0}, {:.0}", gx, gy);
             draw_text(&coord_text, mx5 + 12.0, my5 - 4.0, 12.0, Color::new(1.0, 1.0, 1.0, 0.8));
         }
+
+        // ── Properties panel (View mode, entity selected) ──
+        self.draw_properties_panel();
+    }
+
+    fn draw_properties_panel(&self) {
+        let target = match &self.selected_entity { Some(t) => t, None => return };
+        let props = self.entity_properties();
+        if props.is_empty() { return; }
+
+        let sw = self.screen_w;
+        let sh = self.screen_h;
+        let panel_w = 220.0;
+        let row_h = 22.0;
+        let title_row_h = 26.0;
+        let pad = 8.0;
+        let title_font = 18.0;
+        let prop_font = 15.0;
+        let btn_font = 14.0;
+        // Extra button row when editing
+        let is_editing = self.editing_field.is_some();
+        let btn_row_h = if is_editing { 4.0 + 22.0 } else { 0.0 };
+        let panel_h = pad * 2.0 + title_row_h + 2.0 + props.len() as f32 * row_h + btn_row_h;
+        // Bottom-right corner
+        let panel_x = sw - panel_w - 12.0;
+        let panel_y = sh - panel_h - 12.0;
+
+        // Semi-transparent background
+        draw_rectangle(panel_x - 2.0, panel_y - 2.0, panel_w + 4.0, panel_h + 4.0, Color::new(0.0, 0.0, 0.0, 0.82));
+        draw_rectangle_lines(panel_x - 2.0, panel_y - 2.0, panel_w + 4.0, panel_h + 4.0, 1.0, Color::new(0.5, 0.5, 0.5, 0.8));
+
+        // Title: entity type
+        let type_name = self.entity_type_name(target);
+        draw_text(&type_name, panel_x + 4.0, panel_y + pad + title_font - 4.0, title_font, Color::new(1.0, 1.0, 0.5, 1.0));
+
+        // Separator line
+        let sep_y = panel_y + pad + title_row_h;
+        draw_line(panel_x, sep_y, panel_x + panel_w, sep_y, 1.0, Color::new(0.4, 0.4, 0.4, 0.6));
+
+        // Property rows
+        for (i, (label, field_name, value)) in props.iter().enumerate() {
+            let row_y = sep_y + 4.0 + i as f32 * row_h;
+            let editing_this = self.editing_field.as_deref() == Some(*field_name);
+
+            // Label
+            draw_text(&format!("{}:", label), panel_x + 6.0, row_y + prop_font, prop_font, Color::new(0.7, 0.7, 0.7, 1.0));
+
+            // Value (or edit buffer)
+            let val_x = panel_x + panel_w - 6.0;
+            let val_color = if editing_this { Color::new(1.0, 1.0, 0.3, 1.0) } else { Color::new(1.0, 1.0, 1.0, 1.0) };
+            let val_text = if editing_this { format!("{}|", self.edit_buf) } else { format!("{:.0}", value) };
+            let val_w = measure_text(&val_text, None, 12, 1.0).width;
+            draw_text(&val_text, val_x - val_w, row_y + prop_font, prop_font, val_color);
+        }
+
+        // Apply / Reset buttons (only when editing)
+        if is_editing {
+            let props_end = sep_y + 4.0 + props.len() as f32 * row_h;
+            let btn_sep_y = props_end + 2.0;
+            draw_line(panel_x + 4.0, btn_sep_y, panel_x + panel_w - 4.0, btn_sep_y, 1.0, Color::new(0.3, 0.3, 0.3, 0.6));
+
+            let btn_y = btn_sep_y + 4.0;
+            let btn_h = 18.0;
+            let half_w = (panel_w - 16.0) / 2.0;
+
+            // Apply button (green)
+            let apply_x = panel_x + 6.0;
+            draw_rectangle(apply_x, btn_y, half_w, btn_h, Color::new(0.15, 0.55, 0.15, 0.9));
+            let aw = measure_text("Apply", None, 12, 1.0).width;
+            draw_text("Apply", apply_x + (half_w - aw) / 2.0, btn_y + btn_h - 4.0, btn_font, Color::new(0.8, 1.0, 0.8, 1.0));
+
+            // Reset button (red)
+            let reset_x = apply_x + half_w + 4.0;
+            draw_rectangle(reset_x, btn_y, half_w, btn_h, Color::new(0.55, 0.15, 0.15, 0.9));
+            let rw = measure_text("Reset", None, 12, 1.0).width;
+            draw_text("Reset", reset_x + (half_w - rw) / 2.0, btn_y + btn_h - 4.0, btn_font, Color::new(1.0, 0.8, 0.8, 1.0));
+        }
+    }
+
+    fn entity_type_name(&self, target: &crate::editor::tool::DragTarget) -> String {
+        match target {
+            crate::editor::tool::DragTarget::Platform(_) => "Platform".into(),
+            crate::editor::tool::DragTarget::Spike(_) => "Spike".into(),
+            crate::editor::tool::DragTarget::Coin(_) => "Coin".into(),
+            crate::editor::tool::DragTarget::QuestionBlock(_) => "? Block".into(),
+            crate::editor::tool::DragTarget::Brick(_) => "Brick".into(),
+            crate::editor::tool::DragTarget::Enemy(_) => "Enemy".into(),
+            crate::editor::tool::DragTarget::DartEnemy(_) => "Dart Enemy".into(),
+            crate::editor::tool::DragTarget::OscFireball(_) => "Osc Fireball".into(),
+            crate::editor::tool::DragTarget::Checkpoint(_) => "Checkpoint".into(),
+            crate::editor::tool::DragTarget::PlayerSpawn => "Player Spawn".into(),
+            crate::editor::tool::DragTarget::Flagpole => "Flagpole".into(),
+        }
     }
 }

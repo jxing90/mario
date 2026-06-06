@@ -13,6 +13,8 @@ impl EditorState {
         }
 
         // --- Keyboard shortcuts ---
+        let skip_keys = self.editing_field.is_some();
+        if !skip_keys {
 
         // Tool selection: 1-0
         if is_key_pressed(KeyCode::Key1) { self.tool = Tool::Platform; }
@@ -91,6 +93,7 @@ impl EditorState {
             self.name_buf = self.data.name.clone();
             self.set_status("Enter new level name, Enter to confirm, Esc to cancel...");
         }
+        } // end if !skip_keys
 
         // Save-as text input mode
         if self.save_as_mode {
@@ -159,8 +162,44 @@ impl EditorState {
             return;
         }
 
+        // ── Property editing mode (View mode) ──
+        if self.editing_field.is_some() {
+            while let Some(c) = get_char_pressed() {
+                if c.is_ascii_digit() || c == '-' || c == '.' {
+                    self.edit_buf.push(c);
+                }
+            }
+            if is_key_pressed(KeyCode::Backspace) {
+                self.edit_buf.pop();
+            }
+            if is_key_pressed(KeyCode::Escape) {
+                // Discard edit and go back to viewing
+                self.editing_field = None;
+                self.edit_buf.clear();
+            }
+            if is_key_pressed(KeyCode::Enter) {
+                // Apply current edit
+                if let Ok(val) = self.edit_buf.parse::<f32>() {
+                    let field = self.editing_field.take().unwrap();
+                    self.set_entity_property(&field, val);
+                    self.set_status(&format!("Set {} = {}", field, val));
+                } else {
+                    self.editing_field = None;
+                    self.edit_buf.clear();
+                }
+            }
+        }
+
         // Cancel pending operation
-        if is_key_pressed(KeyCode::Escape) { self.cancel_pending(); }
+        if is_key_pressed(KeyCode::Escape) {
+            self.cancel_pending();
+            if self.selected_entity.is_some() {
+                self.selected_entity = None;
+                self.editing_field = None;
+                self.edit_buf.clear();
+                self.set_status("Entity deselected.");
+            }
+        }
 
         // --- Mouse ---
         let (mx, my) = mouse_position();
@@ -244,6 +283,70 @@ impl EditorState {
                 }
             }
 
+            // 2b. Properties panel (View mode, entity selected)
+            if self.selected_entity.is_some() {
+                let props = self.entity_properties();
+                if !props.is_empty() {
+                    let sw = self.screen_w;
+                    let sh = self.screen_h;
+                    let panel_w = 220.0;
+                    let row_h = 22.0;
+                    let title_row_h = 26.0;
+                    let pad = 8.0;
+                    let is_editing = self.editing_field.is_some();
+                    let btn_extra = if is_editing { 4.0 + 22.0 } else { 0.0 };
+                    let panel_h = pad * 2.0 + title_row_h + 2.0 + props.len() as f32 * row_h + btn_extra;
+                    let panel_x = sw - panel_w - 12.0;
+                    let panel_y = sh - panel_h - 12.0;
+                    let sep_y = panel_y + pad + title_row_h;
+                    if mx >= panel_x && mx <= panel_x + panel_w && my >= panel_y && my <= panel_y + panel_h {
+                        // First check property rows
+                        for (i, (_label, field_name, _value)) in props.iter().enumerate() {
+                            let row_y = sep_y + 4.0 + i as f32 * row_h;
+                            if my >= row_y && my <= row_y + row_h {
+                                // Discard any previous edit, start editing this field
+                                self.editing_field = Some(field_name.to_string());
+                                self.edit_buf.clear();
+                                let props2 = self.entity_properties();
+                                if let Some((_, _, val)) = props2.get(i) {
+                                    self.edit_buf = format!("{:.0}", val);
+                                }
+                                return;
+                            }
+                        }
+                        // Then check Apply / Reset buttons (only when editing)
+                        if is_editing {
+                            let props_end = sep_y + 4.0 + props.len() as f32 * row_h;
+                            let btn_sep_y = props_end + 2.0;
+                            let btn_y = btn_sep_y + 4.0;
+                            let btn_h = 18.0;
+                            let half_w = (panel_w - 16.0) / 2.0;
+                            let apply_x = panel_x + 6.0;
+                            let reset_x = apply_x + half_w + 4.0;
+                            if my >= btn_y && my <= btn_y + btn_h {
+                                if mx >= apply_x && mx <= apply_x + half_w {
+                                    // Apply
+                                    if let Ok(val) = self.edit_buf.parse::<f32>() {
+                                        let field = self.editing_field.take().unwrap();
+                                        self.set_entity_property(&field, val);
+                                        self.set_status(&format!("Set {} = {}", field, val));
+                                    } else {
+                                        self.editing_field = None;
+                                        self.edit_buf.clear();
+                                    }
+                                    return;
+                                } else if mx >= reset_x && mx <= reset_x + half_w {
+                                    // Reset
+                                    self.editing_field = None;
+                                    self.edit_buf.clear();
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // 3. Canvas: drag, view, erase, or place
             if my > EditorState::HEADER_H {
                 let (wx, wy) = self.screen_to_world(mx, my);
@@ -254,7 +357,17 @@ impl EditorState {
                         self.set_status("Drag to move. Right-click or Esc to cancel.");
                     }
                 } else if self.tool == Tool::View {
-                    // View mode: no modifications; pan handled by left-drag below
+                    // View mode: select entity for property inspection
+                    if let Some(target) = self.hit_test(wx, wy) {
+                        self.selected_entity = Some(target);
+                        self.editing_field = None;
+                        self.edit_buf.clear();
+                        self.set_status("Entity selected. Click property value to edit, Esc to deselect.");
+                    } else {
+                        self.selected_entity = None;
+                        self.editing_field = None;
+                        self.edit_buf.clear();
+                    }
                 } else if self.tool == Tool::Eraser {
                     self.delete_at(wx, wy);
                 } else {
