@@ -109,6 +109,8 @@ pub struct Player {
     pub coins: u32,
     /// Remaining lives (modified externally by Feature #6 Life/Death).
     pub lives: u32,
+    /// Remaining Starman invincibility time (seconds, 0.0 = inactive).
+    pub star_timer: f32,
     /// Previous-frame left key state for dual-key debounce (last-pressed priority).
     prev_left: bool,
     /// Previous-frame right key state for dual-key debounce (last-pressed priority).
@@ -141,6 +143,7 @@ impl Player {
             jump_held: false,
             coins: 0,
             lives: 3,
+            star_timer: 0.0,
             prev_left: false,
             prev_right: false,
             dual_dir: 0.0,
@@ -483,5 +486,10 @@ impl Player {
                 false
             }
         }
+    }
+
+    /// Activates Starman power — grants temporary invincibility.
+    pub fn activate_star(&mut self) {
+        self.star_timer = 10.0; // 10 seconds of invincibility
     }
 }

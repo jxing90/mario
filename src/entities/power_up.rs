@@ -33,6 +33,8 @@ pub enum PowerUpKind {
     SuperMushroom,
     /// Fire Flower — stationary; player gains Fire state and fireball ability on contact.
     FireFlower,
+    /// Starman — bounces like a mushroom; grants temporary invincibility on contact.
+    Starman,
 }
 
 /// A spawned PowerUp entity in the world.
@@ -60,7 +62,7 @@ impl PowerUp {
     /// - For FireFlower: `vel = (0.0, 0.0)` (stationary)
     pub fn new(kind: PowerUpKind, spawn_pos: Vec2) -> Self {
         let vel = match kind {
-            PowerUpKind::SuperMushroom => Vec2 {
+            PowerUpKind::SuperMushroom | PowerUpKind::Starman => Vec2 {
                 x: BOUNCE_SPEED,
                 y: JUMP_VELOCITY,
             },

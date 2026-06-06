@@ -9,6 +9,7 @@ use crate::entities::enemy::{Enemy, EnemyConfig};
 use crate::entities::player::Player;
 use crate::entities::flagpole::{Flagpole, FlagpolePhase};
 use crate::entities::checkpoint::Checkpoint;
+use crate::entities::power_up::{PowerUp, PowerUpKind};
 use crate::entities::question_block::QuestionBlock;
 use crate::level::{BrickSpawn, Level, LevelBounds, Vec2};
 use crate::systems::camera::Camera;
@@ -39,6 +40,8 @@ pub struct PlayingState {
     pub enemies: Vec<Enemy>,
     pub coins: Vec<Coin>,
     pub question_blocks: Vec<QuestionBlock>,
+    /// Spawned power-up entities (mushrooms, flowers) bouncing in the world.
+    pub power_ups: Vec<PowerUp>,
     /// Breakable bricks: when hit from below by Super/Fire Mario, they shatter.
     pub bricks: Vec<Brick>,
     /// Spawn positions for brick reset on death (bricks are restored).
@@ -58,6 +61,8 @@ pub struct PlayingState {
     pub screen_h: f32,
     pub current_level: u32,
     level_bounds: LevelBounds,
+    /// Xorshift64 RNG state for question block loot randomization.
+    rng_state: u64,
 }
 
 impl PlayingState {
@@ -122,6 +127,7 @@ impl PlayingState {
             enemies,
             coins,
             question_blocks,
+            power_ups: Vec::new(),
             bricks,
             brick_spawns,
             invuln_timer: 0.0,
@@ -135,7 +141,26 @@ impl PlayingState {
             screen_h: 0.0,
             current_level: level_num,
             level_bounds: bounds,
+            rng_state: Self::seed_rng(),
         }
+    }
+
+    /// Seed the xorshift64 RNG from system time (fallback: 1).
+    fn seed_rng() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64 | 1)
+            .unwrap_or(1)
+    }
+
+    /// Xorshift64: returns a pseudo-random f32 in [0.0, 1.0).
+    fn next_rand(&mut self) -> f32 {
+        let mut x = self.rng_state;
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        self.rng_state = x;
+        (x as f64 / u64::MAX as f64) as f32
     }
 
     /// Advance the simulation by one fixed timestep.
@@ -166,6 +191,14 @@ impl PlayingState {
             }
         }
 
+        // 1b. Advance star power timer
+        if self.player.star_timer > 0.0 {
+            self.player.star_timer -= dt;
+            if self.player.star_timer < 0.0 {
+                self.player.star_timer = 0.0;
+            }
+        }
+
         // 2. Flagpole slide animation (if active, advance and check completion)
         if self.flagpole.phase == FlagpolePhase::Sliding {
             self.flagpole.update(dt);
@@ -180,6 +213,12 @@ impl PlayingState {
         // 3. Enemy patrol update (Step A: enemy.update(dt) for each living enemy)
         for enemy in self.enemies.iter_mut() {
             enemy.update(dt);
+        }
+
+        // 3b. PowerUp physics update (gravity, bounce, terrain collision)
+        for pu in self.power_ups.iter_mut() {
+            let pu_terrain = self.level.query_terrain(&pu.collider());
+            pu.update(dt, &pu_terrain);
         }
 
         // 4. Update player physics with real keyboard input at runtime.
@@ -204,7 +243,6 @@ impl PlayingState {
         // 4a. Hit detection: check block/brick/coin overlap BEFORE terrain
         // collision resolves and pushes the player away.
         let player_aabb = self.player.collider();
-        let player_vy = self.player.vel.y;
 
         // Coins
         for coin in self.coins.iter_mut() {
@@ -215,12 +253,17 @@ impl PlayingState {
         }
 
         // Breakable bricks (Super/Fire only)
+        // Same head-proximity fix as question blocks: vel.y check fails
+        // because ceiling collision zeroes it in the previous frame.
         if !matches!(self.player.state, crate::entities::player::PlayerState::Small) {
             for brick in self.bricks.iter_mut() {
-                if brick.broken { continue; }
+                if brick.broken {
+                    continue;
+                }
                 let ba = brick.collider();
-                if player_aabb.intersects(&ba) && player_vy < 0.0
-                    && (player_aabb.y + player_aabb.h) > ba.y && player_aabb.y < ba.y + ba.h
+                let block_bottom = ba.y + ba.h;
+                if player_aabb.intersects(&ba)
+                    && (player_aabb.y - block_bottom).abs() <= 4.0
                 {
                     brick.broken = true;
                     self.player.vel.y = 100.0;
@@ -229,23 +272,40 @@ impl PlayingState {
         }
 
         // Question blocks
+        // Hit detection uses head-proximity instead of velocity check,
+        // because the previous frame's ceiling collision may have already
+        // zeroed vel.y (player head pushed to block bottom = vel.y=0).
+        // HEAD_TOLERANCE (4px) from Physics::question_block_check.
+        const HEAD_TOLERANCE: f32 = 4.0;
+        // Generate random roll once per frame (used if a block is hit)
+        let block_roll = self.next_rand();
         for block in self.question_blocks.iter_mut() {
             if !block.used {
                 let ba = block.collider();
-                if player_aabb.intersects(&ba) && player_vy < 0.0
-                    && (player_aabb.y + player_aabb.h) > ba.y && player_aabb.y < ba.y + ba.h
+                let block_bottom = ba.y + ba.h;
+                if player_aabb.intersects(&ba)
+                    && (player_aabb.y - block_bottom).abs() <= HEAD_TOLERANCE
                 {
                     block.used = true;
                     self.player.vel.y = 100.0;
-                    // Pseudo-random roll from frame counter
-                    let roll = ((self.frame_count.wrapping_mul(6364136223846793005).wrapping_add(1)) as f64
-                        / u64::MAX as f64) as f32;
-                    if roll < 0.70 {
+                    // Random roll from xorshift64 RNG (pre-generated before loop)
+                    let roll = block_roll;
+                    if roll < 0.65 {
                         self.player.coins += 1;
-                    } else if roll < 0.85 {
-                        self.player.apply_powerup(crate::entities::player::PlayerState::Super);
                     } else {
-                        self.player.apply_powerup(crate::entities::player::PlayerState::Fire);
+                        // Spawn a PowerUp entity that bounces out of the block
+                        let kind = if roll < 0.80 {
+                            PowerUpKind::SuperMushroom
+                        } else if roll < 0.95 {
+                            PowerUpKind::FireFlower
+                        } else {
+                            PowerUpKind::Starman
+                        };
+                        let spawn_pos = Vec2 {
+                            x: ba.x + ba.w / 2.0,
+                            y: ba.y,
+                        };
+                        self.power_ups.push(PowerUp::new(kind, spawn_pos));
                     }
                 }
             }
@@ -255,12 +315,16 @@ impl PlayingState {
         // before terrain collision pushes the player away).
         self.player.update(dt, &input, &terrain);
 
-        // 5. Hazard check: if player is NOT invulnerable and hazards exist → death
+        // 5. Hazard check: if player is NOT invulnerable and hazards exist → damage
         let kill_y = self.level_bounds.kill_y;
         let events = Physics::hazard_check(&self.player, &terrain, kill_y);
 
-        if !events.is_empty() && self.invuln_timer <= 0.0 && self.player.lives > 0 {
-            self.player.lives -= 1;
+        if !events.is_empty() && self.invuln_timer <= 0.0 && self.player.star_timer <= 0.0 && self.player.lives > 0 {
+            // take_damage(): true = fatal (Small dies), false = downgrade (Super/Fire → Small)
+            if self.player.take_damage() {
+                self.player.lives -= 1;
+            }
+            self.invuln_timer = 2.0; // ~2s invulnerability window
         }
 
         // 6. Enemy collision detection (Step D: enemy_check)
@@ -274,12 +338,41 @@ impl PlayingState {
                     self.player.vel.y = self.enemies[i].config.bounce_velocity;
                 }
                 CollisionEvent::EnemyContact(_)
-                    if self.invuln_timer <= 0.0 && self.player.lives > 0 =>
+                    if self.invuln_timer <= 0.0 && self.player.star_timer <= 0.0 && self.player.lives > 0 =>
                 {
-                    self.player.lives -= 1;
+                    // take_damage(): true = fatal (Small dies), false = downgrade
+                    if self.player.take_damage() {
+                        self.player.lives -= 1;
+                    }
+                    self.invuln_timer = 2.0;
                 }
                 _ => {}
             }
+        }
+
+        // 7b. PowerUp collection: check player overlap with each power-up
+        let player_col = self.player.collider();
+        let mut collected_indices: Vec<usize> = Vec::new();
+        for (i, pu) in self.power_ups.iter().enumerate() {
+            if player_col.intersects(&pu.collider()) {
+                collected_indices.push(i);
+                match pu.kind {
+                    PowerUpKind::SuperMushroom => {
+                        self.player.apply_powerup(crate::entities::player::PlayerState::Super);
+                    }
+                    PowerUpKind::FireFlower => {
+                        self.player.apply_powerup(crate::entities::player::PlayerState::Fire);
+                    }
+                    PowerUpKind::Starman => {
+                        self.player.activate_star();
+                    }
+                    PowerUpKind::Coin => {} // coins are handled separately
+                }
+            }
+        }
+        // Remove collected power-ups (reverse order to preserve indices)
+        for i in collected_indices.into_iter().rev() {
+            self.power_ups.remove(i);
         }
 
         // 8. Flagpole check: if player overlaps flagpole collider → victory slide
@@ -550,6 +643,35 @@ impl PlayingState {
             }
         }
 
+        // ── 8b. Power-ups (mushroom = green, flower = red/orange) ──
+        for pu in &self.power_ups {
+            let (px, py) = ws(pu.pos.x, pu.pos.y);
+            let half = 8.0 * sx.min(sy);
+            match pu.kind {
+                PowerUpKind::SuperMushroom => {
+                    // Green mushroom cap
+                    draw_rectangle(px - half, py - half, half * 2.0, half * 2.0,
+                        macroquad::color::GREEN);
+                    // White spots
+                    draw_circle(px - 3.0 * sx, py - 3.0 * sy, 2.0 * sx.min(sy),
+                        macroquad::color::WHITE);
+                    draw_circle(px + 3.0 * sx, py + 3.0 * sy, 2.0 * sx.min(sy),
+                        macroquad::color::WHITE);
+                }
+                PowerUpKind::FireFlower => {
+                    // Orange/red flower
+                    draw_circle(px, py, half, macroquad::color::Color::new(1.0, 0.4, 0.0, 1.0));
+                    draw_circle(px, py, half * 0.5, macroquad::color::YELLOW);
+                }
+                PowerUpKind::Starman => {
+                    // Yellow star — draw a simple star shape with cross + diagonals
+                    draw_circle(px, py, half, macroquad::color::YELLOW);
+                    draw_text("*", px - half * 0.5, py + half * 0.5, half * 1.6, macroquad::color::BLACK);
+                }
+                PowerUpKind::Coin => {}
+            }
+        }
+
         // ── 9. Player (Mario) ──
         let p = self.player.pos();
         let (spx, spy) = ws(p.x, p.y);
@@ -559,13 +681,26 @@ impl PlayingState {
         let sx_s = sx * unit;
         let sy_s = sy * unit;
 
-        // Invulnerability flicker
+        // Invulnerability flicker (damage) & star power rainbow
         let flicker = self.invuln_timer > 0.0 && ((self.flicker_phase * 4.0) as u32) % 2 == 1;
+        let star_active = self.player.star_timer > 0.0;
 
         if !flicker {
-            let hat_color = macroquad::color::Color::new(0.85, 0.15, 0.1, 1.0);
-            let skin_color = macroquad::color::Color::new(1.0, 0.75, 0.55, 1.0);
-            let overall_color = macroquad::color::Color::new(0.1, 0.3, 0.9, 1.0);
+            // Rainbow cycling during star power
+            let (hat_color, overall_color, skin_color) = if star_active {
+                let hue = ((self.frame_count as f32 * 0.05) % 1.0) * 6.2832; // cycle ~1s
+                let r = (hue.sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+                let g = ((hue + 2.094).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+                let b = ((hue + 4.189).sin() * 0.5 + 0.5).clamp(0.0, 1.0);
+                let rainbow = macroquad::color::Color::new(r, g, b, 1.0);
+                (rainbow, rainbow, rainbow)
+            } else {
+                (
+                    macroquad::color::Color::new(0.85, 0.15, 0.1, 1.0),
+                    macroquad::color::Color::new(0.1, 0.3, 0.9, 1.0),
+                    macroquad::color::Color::new(1.0, 0.75, 0.55, 1.0),
+                )
+            };
             let shoe_color = macroquad::color::Color::new(0.45, 0.25, 0.15, 1.0);
             let eye_color = macroquad::color::BLACK;
             let button_color = macroquad::color::YELLOW;
@@ -620,6 +755,17 @@ impl PlayingState {
             font_size,
             time_color,
         );
+        // Star power countdown (only visible when active)
+        if self.player.star_timer > 0.0 {
+            let star_color = macroquad::color::Color::new(1.0, 0.85, 0.0, 1.0); // gold
+            draw_text(
+                &format!("STAR:{:.1}", self.player.star_timer),
+                8.0,
+                76.0 * sy,
+                font_size,
+                star_color,
+            );
+        }
     }
 }
 
