@@ -71,6 +71,8 @@ struct JsonLevel {
     #[serde(default)]
     checkpoints: Vec<JsonPos>,
     flagpole: JsonPos,
+    #[serde(default = "default_player_spawn")]
+    player_spawn: JsonPos,
     #[serde(default = "default_parallax")]
     parallax: Vec<f32>,
 }
@@ -94,6 +96,10 @@ struct JsonDartEnemy { x: f32, y: f32 }
 struct JsonOscFireball { x: f32, top_y: f32, bottom_y: f32 }
 
 fn default_parallax() -> Vec<f32> { vec![0.1, 0.3, 0.6] }
+
+fn default_player_spawn() -> JsonPos {
+    JsonPos { x: 100.0, y: 600.0 }
+}
 
 // ============================================================================
 // Public entity spawn data (read by PlayingState)
@@ -123,6 +129,9 @@ pub struct CheckpointSpawn { pub pos: Vec2 }
 #[derive(Debug, Clone)]
 pub struct FlagpoleSpawn { pub pos: Vec2 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct PlayerSpawn { pub pos: Vec2 }
+
 // ============================================================================
 // Level
 // ============================================================================
@@ -141,6 +150,7 @@ pub struct Level {
     pub osc_fireball_spawns: Vec<OscFireballSpawn>,
     pub checkpoint_spawns: Vec<CheckpointSpawn>,
     pub flagpole_spawn: FlagpoleSpawn,
+    pub player_spawn: PlayerSpawn,
 }
 
 impl Default for Level {
@@ -153,15 +163,23 @@ impl Level {
     pub fn new() -> Self { Self::load(1) }
 
     /// Load level n (1-4). Falls back to level 1 for invalid numbers.
+    /// Tries filesystem first (so editor modifications are live), then
+    /// falls back to the embedded JSON (compile-time include_str!).
     pub fn load(n: u32) -> Self {
-        let json: &str = match n {
-            1 => include_str!("../assets/levels/1.json"),
-            2 => include_str!("../assets/levels/2.json"),
-            3 => include_str!("../assets/levels/3.json"),
-            4 => include_str!("../assets/levels/4.json"),
-            _ => include_str!("../assets/levels/1.json"),
-        };
-        let data: JsonLevel = serde_json::from_str(json)
+        let path = format!("assets/levels/{}.json", n);
+        let json_str: String = std::fs::read_to_string(&path)
+            .unwrap_or_else(|_| {
+                // Fallback: use compile-time embedded JSON
+                let embedded: &str = match n {
+                    1 => include_str!("../assets/levels/1.json"),
+                    2 => include_str!("../assets/levels/2.json"),
+                    3 => include_str!("../assets/levels/3.json"),
+                    4 => include_str!("../assets/levels/4.json"),
+                    _ => include_str!("../assets/levels/1.json"),
+                };
+                embedded.to_string()
+            });
+        let data: JsonLevel = serde_json::from_str(&json_str)
             .unwrap_or_else(|e| panic!("Failed to parse level {n}: {e}"));
 
         let platforms: Vec<Platform> = data.platforms.iter().map(|p| Platform {
@@ -208,10 +226,14 @@ impl Level {
             pos: Vec2 { x: data.flagpole.x, y: data.flagpole.y },
         };
 
+        let player_spawn = PlayerSpawn {
+            pos: Vec2 { x: data.player_spawn.x, y: data.player_spawn.y },
+        };
+
         Level { platforms, spikes, bounds, parallax_layers,
             coin_spawns, block_spawns, brick_spawns, enemy_spawns,
             dart_enemy_spawns, osc_fireball_spawns,
-            checkpoint_spawns, flagpole_spawn }
+            checkpoint_spawns, flagpole_spawn, player_spawn }
     }
 
     pub fn platforms(&self) -> &[Platform] { &self.platforms }

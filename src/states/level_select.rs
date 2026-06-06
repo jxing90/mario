@@ -65,8 +65,11 @@ impl LevelSelectState {
         self.prev_confirm = confirm;
         if confirm_just {
             let level_num = (self.selected + 1) as u32;
+            let level = crate::level::Level::load(level_num);
+            let spawn = level.player_spawn.pos;
             let mut player = Player::new(PlayerConfig::default());
-            player.pos.y = 600.0; // feet on ground
+            player.pos.x = spawn.x;
+            player.pos.y = spawn.y;
             player.on_ground = true;
             let life_state = LifeState::new();
             let playing = PlayingState::with_level(player, life_state, level_num);

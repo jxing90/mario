@@ -34,8 +34,11 @@ impl VictoryState {
     }
 
     fn make_playing(&self, level: u32, sw: f32, sh: f32) -> GameState {
+        let lvl = crate::level::Level::load(level);
+        let spawn = lvl.player_spawn.pos;
         let mut player = Player::new(PlayerConfig::default());
-        player.pos.y = 600.0;
+        player.pos.x = spawn.x;
+        player.pos.y = spawn.y;
         player.on_ground = true;
         // Carry over player progress from previous level
         player.coins = self.coins;

@@ -76,12 +76,18 @@ struct LevelData {
     #[serde(default)]
     checkpoints: Vec<Pos>,
     flagpole: Pos,
+    #[serde(default = "default_player_spawn_editor")]
+    player_spawn: Pos,
     #[serde(default = "default_parallax")]
     parallax: Vec<f32>,
 }
 
 fn default_parallax() -> Vec<f32> {
     vec![0.1, 0.3, 0.6]
+}
+
+fn default_player_spawn_editor() -> Pos {
+    Pos { x: 100.0, y: 600.0 }
 }
 
 impl Default for LevelData {
@@ -100,6 +106,7 @@ impl Default for LevelData {
             osc_fireballs: vec![],
             checkpoints: vec![],
             flagpole: Pos { x: 3500.0, y: 560.0 },
+            player_spawn: Pos { x: 100.0, y: 600.0 },
             parallax: default_parallax(),
         }
     }
@@ -121,6 +128,7 @@ enum Tool {
     OscFireball,
     Checkpoint,
     Flagpole,
+    PlayerSpawn,
     Eraser,
 }
 
@@ -136,6 +144,7 @@ impl Tool {
         Tool::OscFireball,
         Tool::Checkpoint,
         Tool::Flagpole,
+        Tool::PlayerSpawn,
         Tool::Eraser,
     ];
 
@@ -151,6 +160,7 @@ impl Tool {
             Tool::OscFireball => "OscFire",
             Tool::Checkpoint => "Checkpt",
             Tool::Flagpole => "Flagpole",
+            Tool::PlayerSpawn => "Spawn",
             Tool::Eraser => "Eraser",
         }
     }
@@ -167,6 +177,7 @@ impl Tool {
             Tool::OscFireball => "8",
             Tool::Checkpoint => "9",
             Tool::Flagpole => "0",
+            Tool::PlayerSpawn => "P",
             Tool::Eraser => "Del",
         }
     }
@@ -389,6 +400,10 @@ impl EditorState {
                 self.data.flagpole = Pos { x, y };
                 self.set_status("Flagpole moved.");
             }
+            Tool::PlayerSpawn => {
+                self.data.player_spawn = Pos { x, y };
+                self.set_status("Player spawn set.");
+            }
             Tool::Eraser => {
                 self.delete_at(x, y);
             }
@@ -460,6 +475,9 @@ impl EditorState {
         if is_key_pressed(KeyCode::Key8) { self.tool = Tool::OscFireball; }
         if is_key_pressed(KeyCode::Key9) { self.tool = Tool::Checkpoint; }
         if is_key_pressed(KeyCode::Key0) { self.tool = Tool::Flagpole; }
+        if is_key_pressed(KeyCode::P) {
+            self.tool = Tool::PlayerSpawn;
+        }
         if is_key_pressed(KeyCode::Delete) || is_key_pressed(KeyCode::Backspace) {
             self.tool = Tool::Eraser;
         }
@@ -688,6 +706,17 @@ impl EditorState {
             let (fx, fy) = ws(self.data.flagpole.x, self.data.flagpole.y);
             draw_line(fx, fy, fx, fy - 120.0 * self.zoom, 6.0 * self.zoom, Color::new(0.6, 0.6, 0.6, 0.9));
             draw_rectangle(fx + 6.0 * self.zoom, fy - 120.0 * self.zoom, 24.0 * self.zoom, 18.0 * self.zoom, GREEN);
+        }
+
+        // ── Player spawn ──
+        {
+            let (sx, sy) = ws(self.data.player_spawn.x, self.data.player_spawn.y);
+            // Mario silhouette: red hat + blue overalls
+            let sz = 12.0 * self.zoom;
+            draw_rectangle(sx - sz * 0.5, sy - sz * 2.0, sz, sz * 0.3, RED);
+            draw_rectangle(sx - sz * 0.5, sy - sz * 1.7, sz, sz * 0.4, Color::new(1.0, 0.75, 0.55, 1.0));
+            draw_rectangle(sx - sz * 0.5, sy - sz * 1.3, sz, sz * 0.5, Color::new(0.1, 0.3, 0.9, 1.0));
+            draw_text("START", sx + sz * 0.7, sy - sz * 1.2, 10.0 * self.zoom, YELLOW);
         }
 
         // ── Pending placement preview ──
