@@ -51,6 +51,8 @@ pub struct LevelBounds { pub min_x: f32, pub max_x: f32, pub min_y: f32, pub kil
 
 #[derive(Deserialize)]
 struct JsonLevel {
+    #[serde(default)]
+    name: String,
     bounds: JsonBounds,
     #[serde(default)]
     platforms: Vec<JsonRect>,
@@ -138,6 +140,7 @@ pub struct PlayerSpawn { pub pos: Vec2 }
 
 /// Complete static level data loaded from assets/level.json at compile time.
 pub struct Level {
+    pub name: String,
     platforms: Vec<Platform>,
     spikes: Vec<Spike>,
     bounds: LevelBounds,
@@ -230,7 +233,13 @@ impl Level {
             pos: Vec2 { x: data.player_spawn.x, y: data.player_spawn.y },
         };
 
-        Level { platforms, spikes, bounds, parallax_layers,
+        let name = if data.name.is_empty() {
+            format!("Level {}", n)
+        } else {
+            data.name.clone()
+        };
+
+        Level { name, platforms, spikes, bounds, parallax_layers,
             coin_spawns, block_spawns, brick_spawns, enemy_spawns,
             dart_enemy_spawns, osc_fireball_spawns,
             checkpoint_spawns, flagpole_spawn, player_spawn }
@@ -255,4 +264,23 @@ impl Level {
     pub fn bounds(&self) -> LevelBounds { self.bounds }
 
     pub fn parallax_layers(&self) -> &[ParallaxLayer] { &self.parallax_layers }
+}
+
+/// Scan `assets/levels/` for all `{n}.json` files, return sorted level numbers.
+pub fn list_levels() -> Vec<u32> {
+    let mut nums = Vec::new();
+    let dir = std::path::Path::new("assets/levels");
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if let Some(rest) = name.strip_suffix(".json") {
+                if let Ok(n) = rest.parse::<u32>() {
+                    nums.push(n);
+                }
+            }
+        }
+    }
+    nums.sort_unstable();
+    nums
 }

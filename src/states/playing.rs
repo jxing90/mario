@@ -364,11 +364,21 @@ impl PlayingState {
             self.sfx(SoundManager::play_fireball);
         }
 
-        // 3g. Dart update + terrain collision (darts die on platform contact)
-        let dart_terrain: Vec<crate::level::Tile> = self.level.platforms()
+        // 3g. Dart update + terrain collision (darts die on platform/brick/block contact)
+        let mut dart_terrain: Vec<crate::level::Tile> = self.level.platforms()
             .iter()
             .map(|p| crate::level::Tile::Platform(p.aabb))
             .collect();
+        // Question blocks also block darts (used or not)
+        for block in &self.question_blocks {
+            dart_terrain.push(crate::level::Tile::Platform(block.collider()));
+        }
+        // Bricks block darts too (unless shattered)
+        for brick in &self.bricks {
+            if !brick.broken {
+                dart_terrain.push(crate::level::Tile::Platform(brick.collider()));
+            }
+        }
         for dart in self.darts.iter_mut() {
             if !dart.alive { continue; }
             dart.update(dt);
@@ -560,11 +570,13 @@ impl PlayingState {
             let player_col = self.player.collider();
             for dart in self.darts.iter_mut() {
                 if !dart.alive { continue; }
-                if player_col.intersects(&dart.collider())
-                    && self.invuln_timer <= 0.0
-                    && self.player.star_timer <= 0.0
-                    && self.player.lives > 0
-                {
+                if !player_col.intersects(&dart.collider()) { continue; }
+                // Star power: destroy dart on contact (no damage)
+                if self.player.star_timer > 0.0 {
+                    dart.kill();
+                    continue;
+                }
+                if self.invuln_timer <= 0.0 && self.player.lives > 0 {
                     dart.kill();
                     let fatal = self.player.take_damage();
                     if fatal {
@@ -587,13 +599,15 @@ impl PlayingState {
         // 5b. Oscillating fireball-player collision check
         {
             let player_col = self.player.collider();
-            for ofb in self.osc_fireballs.iter() {
+            for ofb in self.osc_fireballs.iter_mut() {
                 if !ofb.alive { continue; }
-                if player_col.intersects(&ofb.collider())
-                    && self.invuln_timer <= 0.0
-                    && self.player.star_timer <= 0.0
-                    && self.player.lives > 0
-                {
+                if !player_col.intersects(&ofb.collider()) { continue; }
+                // Star power: destroy oscillating fireball on contact (no damage)
+                if self.player.star_timer > 0.0 {
+                    ofb.kill();
+                    continue;
+                }
+                if self.invuln_timer <= 0.0 && self.player.lives > 0 {
                     let fatal = self.player.take_damage();
                     if fatal {
                         self.player.lives -= 1;
@@ -621,6 +635,11 @@ impl PlayingState {
                 CollisionEvent::EnemyStomp(i) => {
                     self.enemies[i].alive = false;
                     self.player.vel.y = self.enemies[i].config.bounce_velocity;
+                    self.sfx(SoundManager::play_stomp);
+                }
+                // Star power: kill enemies on contact
+                CollisionEvent::EnemyContact(i) if self.player.star_timer > 0.0 => {
+                    self.enemies[i].alive = false;
                     self.sfx(SoundManager::play_stomp);
                 }
                 CollisionEvent::EnemyContact(_)
@@ -658,6 +677,7 @@ impl PlayingState {
                 let player_col = self.player.collider();
                 let mut stomped = false;
                 let mut damaged = false;
+                let mut star_killed = false;
                 for (_i, de) in self.dart_enemies.iter_mut().enumerate() {
                     if !de.alive {
                         continue;
@@ -674,11 +694,15 @@ impl PlayingState {
                         de.kill();
                         self.player.vel.y = -200.0;
                         stomped = true;
+                    } else if self.player.star_timer > 0.0 {
+                        // Star power: kill dart enemy on contact
+                        de.kill();
+                        star_killed = true;
                     } else {
                         damaged = true;
                     }
                 }
-                if stomped {
+                if stomped || star_killed {
                     self.sfx(SoundManager::play_stomp);
                 }
                 if damaged && self.invuln_timer <= 0.0

@@ -42,7 +42,7 @@ impl Default for PlayerConfig {
             acceleration: 200.0 / 0.3, // ≈ 666.67 → reach max_speed in 0.3s
             max_speed: 200.0,
             friction: 200.0 / 0.2, // 1000.0 → stop from max_speed in 0.2s
-            jump_initial_velocity: -420.0, // strong impulse (~98px short tap)
+            jump_initial_velocity: -350.0, // ~75% of original; peak reach ~145px
             max_jump_duration: 0.35,       // hold window for variable-height jump
             sprint_multiplier: 1.5,
             air_control_factor: 0.6,
