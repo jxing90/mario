@@ -271,7 +271,7 @@ impl EditorState {
 
     fn screen_to_world(&self, sx: f32, sy: f32) -> (f32, f32) {
         let wx = sx / self.zoom + self.cam_x;
-        let wy = sy / self.zoom + self.cam_y;
+        let wy = (sy - 40.0) / self.zoom + self.cam_y;
         (wx, wy)
     }
 
