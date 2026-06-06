@@ -5,6 +5,7 @@ pub mod checkpoint;
 pub mod enemy;
 pub mod coin;
 pub mod question_block;
+pub mod brick;
 pub mod power_up;
 pub mod fireball;
 pub mod loot_table;

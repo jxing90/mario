@@ -54,4 +54,19 @@ impl Coin {
         self.collected = false;
         self.frame = 0;
     }
+
+    /// Draws the coin as a yellow circle at its world position.
+    /// Only draws if not yet collected.
+    pub fn draw(
+        &self,
+        sx: f32,
+        sy: f32,
+        ws: &impl Fn(f32, f32) -> (f32, f32),
+    ) {
+        if self.collected {
+            return;
+        }
+        let (scx, scy) = ws(self.pos.x, self.pos.y);
+        macroquad::shapes::draw_circle(scx, scy, 6.0 * sx.min(sy), macroquad::color::YELLOW);
+    }
 }

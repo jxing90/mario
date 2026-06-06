@@ -8,6 +8,7 @@ use crate::entities::coin::Coin;
 use crate::entities::enemy::{Enemy, EnemyConfig};
 use crate::entities::player::Player;
 use crate::entities::flagpole::{Flagpole, FlagpolePhase};
+use crate::entities::brick::Brick;
 use crate::entities::checkpoint::Checkpoint;
 use crate::entities::power_up::{PowerUp, PowerUpKind};
 use crate::entities::question_block::QuestionBlock;
@@ -104,7 +105,7 @@ impl PlayingState {
         // Spawn breakable bricks from level config
         let brick_spawns: Vec<BrickSpawn> = level.brick_spawns.clone();
         let bricks: Vec<Brick> = brick_spawns.iter()
-            .map(|b| Brick { pos: Vec2 { x: b.pos.x, y: b.pos.y }, broken: false })
+            .map(|b| Brick::new(Vec2 { x: b.pos.x, y: b.pos.y }))
             .collect();
 
         // Spawn enemies from level config
@@ -558,121 +559,47 @@ impl PlayingState {
             draw_rectangle(wx, wy, 4.0 * sx, (bounds.kill_y - 0.0) * sy, wall_color);
         }
 
-        // ── 3. Spikes (drawn from Level terrain query at ground level) ──
-        for spike_x in &[300.0_f32, 700.0, 1100.0, 1500.0] {
-            let (sx_pos, sy_pos) = ws(*spike_x, 592.0);
-            draw_rectangle(sx_pos, sy_pos, 16.0 * sx, 8.0 * sy, spike_color);
+        // ── 3. Spikes — triangular danger zones (from level data) ──
+        for spike in self.level.spikes() {
+            spike.draw(sx, sy, &ws, spike_color);
         }
 
         // ── 4. Coins (yellow circles, only uncollected) ──
-        use macroquad::shapes::draw_circle;
-        let coin_color = macroquad::color::YELLOW;
         for coin in &self.coins {
-            if !coin.collected {
-                let (scx, scy) = ws(coin.pos.x, coin.pos.y);
-                draw_circle(scx, scy, 6.0 * sx.min(sy), coin_color);
-            }
+            coin.draw(sx, sy, &ws);
         }
 
-        // ── 5. Question blocks (orange "?" or dark "used") ──
-        use macroquad::text::draw_text;
+        // ── 5. Question blocks ──
         for block in &self.question_blocks {
-            let (sbx, sby) = ws(block.pos.x, block.pos.y);
-            if block.used {
-                draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, macroquad::color::DARKGRAY);
-            } else {
-                draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, macroquad::color::Color::new(1.0, 0.65, 0.0, 1.0));
-                draw_text("?", sbx + 8.0 * sx, sby + 24.0 * sy, 24.0 * sx.min(sy), macroquad::color::WHITE);
-            }
+            block.draw(sx, sy, &ws);
         }
 
-        // ── 5b. Breakable bricks (brown, or gone if broken) ──
-        let brick_color = macroquad::color::Color::new(0.65, 0.40, 0.20, 1.0);
+        // ── 5b. Breakable bricks ──
         for brick in &self.bricks {
-            if !brick.broken {
-                let (sbx, sby) = ws(brick.pos.x, brick.pos.y);
-                draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, brick_color);
-                // Brick lines
-                let line_color = macroquad::color::Color::new(0.35, 0.20, 0.10, 1.0);
-                draw_rectangle(sbx, sby + 15.0 * sy, 32.0 * sx, 2.0 * sy, line_color);
-                draw_rectangle(sbx + 15.0 * sx, sby, 2.0 * sx, 15.0 * sy, line_color);
-            }
+            brick.draw(sx, sy, &ws);
         }
 
         // ── 6. Checkpoints ──
-        let cp_color = macroquad::color::Color::new(0.2, 0.8, 0.2, 1.0);
         for cp in &self.checkpoints {
-            let (cpx, cpy) = ws(cp.pos.x, cp.pos.y);
-            let cp_h = if cp.activated { 48.0 } else { 32.0 };
-            draw_rectangle(cpx, cpy - cp_h * sy, 8.0 * sx, cp_h * sy, cp_color);
+            cp.draw(sx, sy, &ws);
         }
 
-        // ── 7. Flagpole (prominent goal marker) ──
-        let fp = self.flagpole.pos;
-        let (fpx, fpy) = ws(fp.x, fp.y);
-        let pole_w = 6.0 * sx;
-        let pole_h = 120.0 * sy;
-        // Pole shadow
-        draw_rectangle(fpx + 2.0 * sx, fpy - pole_h + 2.0 * sy, pole_w, pole_h, macroquad::color::DARKGRAY);
-        // Main pole
-        draw_rectangle(fpx, fpy - pole_h, pole_w, pole_h, macroquad::color::GRAY);
-        // Green flag (triangular-ish)
-        let flag_w = 24.0 * sx;
-        let flag_h = 18.0 * sy;
-        draw_rectangle(fpx + pole_w, fpy - pole_h, flag_w, flag_h, macroquad::color::GREEN);
-        // Star on flag
-        draw_text("*", fpx + pole_w + 6.0 * sx, fpy - pole_h + 14.0 * sy, 16.0 * sx.min(sy), macroquad::color::YELLOW);
-        // "GOAL" label
-        draw_text("GOAL", fpx - 8.0 * sx, fpy - pole_h - 20.0 * sy, 20.0 * sx.min(sy), macroquad::color::GOLD);
-        // Ground base
-        draw_rectangle(fpx - 8.0 * sx, fpy, pole_w + 16.0 * sx, 8.0 * sy, macroquad::color::DARKGRAY);
+        // ── 7. Flagpole ──
+        self.flagpole.draw(sx, sy, &ws);
 
-        // ── 8. Enemies (drawn from foot upward, same as player) ──
+        // ── 8. Enemies ──
         for enemy in &self.enemies {
-            if enemy.alive {
-                let ep = enemy.pos();
-                // Enemy collider bottom is at pos.y; draw from foot going up 16px
-                let (sex, sey) = ws(ep.x, ep.y - 16.0);
-                draw_rectangle(sex, sey, 16.0 * sx, 16.0 * sy, macroquad::color::BROWN);
-                // Eyes in upper portion
-                draw_circle(sex + 4.0 * sx, sey + 3.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
-                draw_circle(sex + 12.0 * sx, sey + 3.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
-                // Feet
-                draw_rectangle(sex + 2.0 * sx, sey + 12.0 * sy, 5.0 * sx, 4.0 * sy, macroquad::color::BLACK);
-                draw_rectangle(sex + 9.0 * sx, sey + 12.0 * sy, 5.0 * sx, 4.0 * sy, macroquad::color::BLACK);
-            }
+            enemy.draw(sx, sy, &ws);
         }
 
-        // ── 8b. Power-ups (mushroom = green, flower = red/orange) ──
+        // ── 8b. Power-ups ──
         for pu in &self.power_ups {
-            let (px, py) = ws(pu.pos.x, pu.pos.y);
-            let half = 8.0 * sx.min(sy);
-            match pu.kind {
-                PowerUpKind::SuperMushroom => {
-                    // Green mushroom cap
-                    draw_rectangle(px - half, py - half, half * 2.0, half * 2.0,
-                        macroquad::color::GREEN);
-                    // White spots
-                    draw_circle(px - 3.0 * sx, py - 3.0 * sy, 2.0 * sx.min(sy),
-                        macroquad::color::WHITE);
-                    draw_circle(px + 3.0 * sx, py + 3.0 * sy, 2.0 * sx.min(sy),
-                        macroquad::color::WHITE);
-                }
-                PowerUpKind::FireFlower => {
-                    // Orange/red flower
-                    draw_circle(px, py, half, macroquad::color::Color::new(1.0, 0.4, 0.0, 1.0));
-                    draw_circle(px, py, half * 0.5, macroquad::color::YELLOW);
-                }
-                PowerUpKind::Starman => {
-                    // Yellow star — draw a simple star shape with cross + diagonals
-                    draw_circle(px, py, half, macroquad::color::YELLOW);
-                    draw_text("*", px - half * 0.5, py + half * 0.5, half * 1.6, macroquad::color::BLACK);
-                }
-                PowerUpKind::Coin => {}
-            }
+            pu.draw(sx, sy, &ws);
         }
 
         // ── 9. Player (Mario) ──
+        use macroquad::shapes::draw_circle;
+        use macroquad::text::draw_text;
         let p = self.player.pos();
         let (spx, spy) = ws(p.x, p.y);
         let is_small = matches!(self.player.state, crate::entities::player::PlayerState::Small);
@@ -766,19 +693,5 @@ impl PlayingState {
                 star_color,
             );
         }
-    }
-}
-
-/// Breakable brick entity. Solid platform; shatters when Super/Fire Mario
-/// hits it from below. Small Mario just bounces off.
-#[derive(Debug, Clone)]
-pub struct Brick {
-    pub pos: Vec2,
-    pub broken: bool,
-}
-
-impl Brick {
-    pub fn collider(&self) -> crate::level::AABB {
-        crate::level::AABB { x: self.pos.x, y: self.pos.y, w: 32.0, h: 32.0 }
     }
 }

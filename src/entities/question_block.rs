@@ -79,4 +79,28 @@ impl QuestionBlock {
         self.used = false;
         self.flicker_frame = 0;
     }
+
+    /// Draws the question block at its world position.
+    /// - Unused: orange rectangle with white "?".
+    /// - Used: dark gray rectangle.
+    pub fn draw(
+        &self,
+        sx: f32,
+        sy: f32,
+        ws: &impl Fn(f32, f32) -> (f32, f32),
+    ) {
+        let (sbx, sby) = ws(self.pos.x, self.pos.y);
+        if self.used {
+            macroquad::shapes::draw_rectangle(sbx, sby, 32.0 * sx, 32.0 * sy, macroquad::color::DARKGRAY);
+        } else {
+            macroquad::shapes::draw_rectangle(
+                sbx, sby, 32.0 * sx, 32.0 * sy,
+                macroquad::color::Color::new(1.0, 0.65, 0.0, 1.0),
+            );
+            macroquad::text::draw_text(
+                "?", sbx + 8.0 * sx, sby + 24.0 * sy,
+                24.0 * sx.min(sy), macroquad::color::WHITE,
+            );
+        }
+    }
 }

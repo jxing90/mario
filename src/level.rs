@@ -190,6 +190,8 @@ impl Level {
 
     pub fn platforms(&self) -> &[Platform] { &self.platforms }
 
+    pub fn spikes(&self) -> &[Spike] { &self.spikes }
+
     pub fn query_terrain(&self, aabb: &AABB) -> Vec<Tile> {
         let mut tiles: Vec<Tile> = self.platforms.iter()
             .filter(|p| p.aabb.intersects(aabb))

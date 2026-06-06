@@ -50,4 +50,34 @@ impl Spike {
     pub fn pos(&self) -> Vec2 {
         self.pos
     }
+
+    /// Draws the spike as triangular danger teeth.
+    /// `color` should be the level-themed spike color.
+    pub fn draw(
+        &self,
+        sx: f32,
+        sy: f32,
+        ws: &impl Fn(f32, f32) -> (f32, f32),
+        color: macroquad::color::Color,
+    ) {
+        let (sx_pos, sy_pos) = ws(self.pos.x - 8.0, self.pos.y + 4.0);
+        let sw = 16.0 * sx;
+        let sh = 12.0 * sy;
+        let n = 4;
+        let tw = sw / n as f32;
+        for i in 0..n {
+            let left = sx_pos + i as f32 * tw;
+            let right = left + tw;
+            let tip = sy_pos - sh;
+            let base = sy_pos;
+            let mid = (left + right) / 2.0;
+            macroquad::shapes::draw_line(left, base, mid, tip, 1.5, color);
+            macroquad::shapes::draw_line(mid, tip, right, base, 1.5, color);
+            macroquad::shapes::draw_line(left, base, right, base, 1.5, color);
+            macroquad::shapes::draw_rectangle(
+                left, tip, tw, sh,
+                macroquad::color::Color::new(color.r * 0.7, color.g * 0.07, color.b * 0.07, 0.6),
+            );
+        }
+    }
 }

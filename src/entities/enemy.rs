@@ -133,4 +133,26 @@ impl Enemy {
     pub fn pos(&self) -> Vec2 {
         self.pos
     }
+
+    /// Draws the enemy as a brown rectangle with eyes and feet.
+    /// Only draws if alive.
+    pub fn draw(
+        &self,
+        sx: f32,
+        sy: f32,
+        ws: &impl Fn(f32, f32) -> (f32, f32),
+    ) {
+        if !self.alive {
+            return;
+        }
+        let ep = self.pos();
+        let (sex, sey) = ws(ep.x, ep.y - 16.0);
+        macroquad::shapes::draw_rectangle(sex, sey, 16.0 * sx, 16.0 * sy, macroquad::color::BROWN);
+        // Eyes
+        macroquad::shapes::draw_circle(sex + 4.0 * sx, sey + 3.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+        macroquad::shapes::draw_circle(sex + 12.0 * sx, sey + 3.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+        // Feet
+        macroquad::shapes::draw_rectangle(sex + 2.0 * sx, sey + 12.0 * sy, 5.0 * sx, 4.0 * sy, macroquad::color::BLACK);
+        macroquad::shapes::draw_rectangle(sex + 9.0 * sx, sey + 12.0 * sy, 5.0 * sx, 4.0 * sy, macroquad::color::BLACK);
+    }
 }

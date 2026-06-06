@@ -166,4 +166,35 @@ impl PowerUp {
             h: 16.0,
         }
     }
+
+    /// Draws the power-up at its world position.
+    /// - SuperMushroom: green cap with white spots.
+    /// - FireFlower: orange circle with yellow center.
+    /// - Starman: yellow circle with black star.
+    /// - Coin: not drawn (handled separately).
+    pub fn draw(
+        &self,
+        sx: f32,
+        sy: f32,
+        ws: &impl Fn(f32, f32) -> (f32, f32),
+    ) {
+        let (px, py) = ws(self.pos.x, self.pos.y);
+        let half = 8.0 * sx.min(sy);
+        match self.kind {
+            PowerUpKind::SuperMushroom => {
+                macroquad::shapes::draw_rectangle(px - half, py - half, half * 2.0, half * 2.0, macroquad::color::GREEN);
+                macroquad::shapes::draw_circle(px - 3.0 * sx, py - 3.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+                macroquad::shapes::draw_circle(px + 3.0 * sx, py + 3.0 * sy, 2.0 * sx.min(sy), macroquad::color::WHITE);
+            }
+            PowerUpKind::FireFlower => {
+                macroquad::shapes::draw_circle(px, py, half, macroquad::color::Color::new(1.0, 0.4, 0.0, 1.0));
+                macroquad::shapes::draw_circle(px, py, half * 0.5, macroquad::color::YELLOW);
+            }
+            PowerUpKind::Starman => {
+                macroquad::shapes::draw_circle(px, py, half, macroquad::color::YELLOW);
+                macroquad::text::draw_text("*", px - half * 0.5, py + half * 0.5, half * 1.6, macroquad::color::BLACK);
+            }
+            PowerUpKind::Coin => {}
+        }
+    }
 }

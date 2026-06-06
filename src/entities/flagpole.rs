@@ -70,4 +70,30 @@ impl Flagpole {
             }
         }
     }
+
+    /// Draws the flagpole with pole, green flag, star, and "GOAL" label.
+    pub fn draw(
+        &self,
+        sx: f32,
+        sy: f32,
+        ws: &impl Fn(f32, f32) -> (f32, f32),
+    ) {
+        let (fpx, fpy) = ws(self.pos.x, self.pos.y);
+        let pole_w = 6.0 * sx;
+        let pole_h = 120.0 * sy;
+        // Pole shadow
+        macroquad::shapes::draw_rectangle(fpx + 2.0 * sx, fpy - pole_h + 2.0 * sy, pole_w, pole_h, macroquad::color::DARKGRAY);
+        // Main pole
+        macroquad::shapes::draw_rectangle(fpx, fpy - pole_h, pole_w, pole_h, macroquad::color::GRAY);
+        // Green flag
+        let flag_w = 24.0 * sx;
+        let flag_h = 18.0 * sy;
+        macroquad::shapes::draw_rectangle(fpx + pole_w, fpy - pole_h, flag_w, flag_h, macroquad::color::GREEN);
+        // Star on flag
+        macroquad::text::draw_text("*", fpx + pole_w + 6.0 * sx, fpy - pole_h + 14.0 * sy, 16.0 * sx.min(sy), macroquad::color::YELLOW);
+        // "GOAL" label
+        macroquad::text::draw_text("GOAL", fpx - 8.0 * sx, fpy - pole_h - 20.0 * sy, 20.0 * sx.min(sy), macroquad::color::GOLD);
+        // Ground base
+        macroquad::shapes::draw_rectangle(fpx - 8.0 * sx, fpy, pole_w + 16.0 * sx, 8.0 * sy, macroquad::color::DARKGRAY);
+    }
 }
