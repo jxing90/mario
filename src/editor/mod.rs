@@ -204,6 +204,11 @@ pub struct EditorState {
     osc_start: Option<(f32, f32)>,
     /// Unsaved changes flag.
     dirty: bool,
+    /// "Save As" mode: typing a file path.
+    save_as_mode: bool,
+    save_path_buf: String,
+    /// Screen-space rectangles of toolbar buttons (computed each frame).
+    tool_rects: Vec<(Tool, f32, f32, f32, f32)>, // (tool, x, y, w, h)
 }
 
 impl EditorState {
@@ -224,6 +229,9 @@ impl EditorState {
             enemy_start: None,
             osc_start: None,
             dirty: false,
+            save_as_mode: false,
+            save_path_buf: String::new(),
+            tool_rects: Vec::new(),
         }
     }
 
@@ -284,12 +292,15 @@ impl EditorState {
     }
 
     pub fn save_level(&mut self) {
-        let path = Self::level_path(self.level_num);
+        self.save_to_path(&Self::level_path(self.level_num));
+    }
+
+    pub fn save_to_path(&mut self, path: &str) {
         match serde_json::to_string_pretty(&self.data) {
-            Ok(json) => match fs::write(&path, json) {
+            Ok(json) => match fs::write(path, &json) {
                 Ok(()) => {
                     self.dirty = false;
-                    self.set_status(&format!("Saved level {} ✓", self.level_num));
+                    self.set_status(&format!("Saved to {} ✓", path));
                 }
                 Err(e) => self.set_status(&format!("Write error: {}", e)),
             },
@@ -481,13 +492,43 @@ impl EditorState {
         }
 
         // Save / Load
-        if is_key_down(KeyCode::LeftControl) && is_key_pressed(KeyCode::S) {
+        if is_key_down(KeyCode::LeftControl) && is_key_down(KeyCode::LeftShift) && is_key_pressed(KeyCode::S) {
+            self.save_as_mode = true;
+            self.save_path_buf = Self::level_path(self.level_num);
+            self.set_status("Type path, Enter to confirm, Esc to cancel...");
+        }
+        if is_key_down(KeyCode::LeftControl) && !is_key_down(KeyCode::LeftShift) && is_key_pressed(KeyCode::S) {
             self.save_level();
         }
         if is_key_pressed(KeyCode::F1) { self.load_level(1); }
         if is_key_pressed(KeyCode::F2) { self.load_level(2); }
         if is_key_pressed(KeyCode::F3) { self.load_level(3); }
         if is_key_pressed(KeyCode::F4) { self.load_level(4); }
+
+        // Save-as text input mode
+        if self.save_as_mode {
+            // Type characters
+            while let Some(c) = get_char_pressed() {
+                if c.is_ascii_graphic() || c == '.' || c == '/' || c == '\\' || c == '_' || c == '-' {
+                    self.save_path_buf.push(c);
+                }
+            }
+            if is_key_pressed(KeyCode::Backspace) {
+                self.save_path_buf.pop();
+            }
+            if is_key_pressed(KeyCode::Enter) {
+                let path = self.save_path_buf.clone();
+                self.save_to_path(&path);
+                self.save_as_mode = false;
+                self.save_path_buf.clear();
+            }
+            if is_key_pressed(KeyCode::Escape) {
+                self.save_as_mode = false;
+                self.save_path_buf.clear();
+                self.set_status("Save cancelled.");
+            }
+            return; // Block other input while typing path
+        }
 
         // Cancel pending operation
         if is_key_pressed(KeyCode::Escape) {
@@ -519,7 +560,7 @@ impl EditorState {
 
     // ── Render ──
 
-    pub fn render(&self) {
+    pub fn render(&mut self) {
         clear_background(Color::new(0.15, 0.15, 0.22, 1.0));
 
         let sw = self.screen_w;
@@ -527,8 +568,11 @@ impl EditorState {
         if sw <= 0.0 || sh <= 0.0 { return; }
 
         // ── World-to-screen transform ──
+        let cam_x = self.cam_x;
+        let cam_y = self.cam_y;
+        let zoom = self.zoom;
         let ws = |wx: f32, wy: f32| -> (f32, f32) {
-            ((wx - self.cam_x) * self.zoom, (wy - self.cam_y) * self.zoom + 40.0)
+            ((wx - cam_x) * zoom, (wy - cam_y) * zoom + 40.0)
         };
 
         // ── Grid ──
@@ -681,25 +725,48 @@ impl EditorState {
             }
         }
 
-        // ── Toolbar (top 40px) ──
+        // ── Toolbar (top 40px, clickable) ──
         draw_rectangle(0.0, 0.0, sw, 40.0, Color::new(0.1, 0.1, 0.18, 1.0));
         let mut tx = 8.0;
+        self.tool_rects.clear();
         for &tool in Tool::ALL {
             let name = tool.name();
             let sc = tool.shortcut();
             let label = format!("[{}] {}", sc, name);
             let fw = 12.0 * label.len() as f32 * 0.55;
+            let bw = fw + 6.0;
+            let bh = 32.0;
+            let (mx, my) = mouse_position();
+            let hover = mx >= tx - 2.0 && mx <= tx + bw && my >= 4.0 && my <= 36.0;
             let bg = if self.tool == tool {
                 Color::new(0.3, 0.5, 0.9, 0.9)
+            } else if hover {
+                Color::new(0.3, 0.35, 0.5, 0.8)
             } else {
                 Color::new(0.2, 0.2, 0.3, 0.7)
             };
-            draw_rectangle(tx - 2.0, 4.0, fw + 6.0, 32.0, bg);
+            draw_rectangle(tx - 2.0, 4.0, bw, bh, bg);
             draw_text(&label, tx, 28.0, 14.0, WHITE);
-            tx += fw + 10.0;
+            self.tool_rects.push((tool, tx - 2.0, 4.0, bw, bh));
+            tx += bw + 4.0;
         }
 
-        // Level indicator
+        // Toolbar separator line
+        draw_line(0.0, 40.0, sw, 40.0, 2.0, Color::new(0.3, 0.3, 0.5, 0.8));
+
+        // Toolbar click detection
+        if is_mouse_button_pressed(MouseButton::Left) {
+            let (mx, my) = mouse_position();
+            for &(tool, rx, ry, rw, rh) in &self.tool_rects {
+                if mx >= rx && mx <= rx + rw && my >= ry && my <= ry + rh {
+                    self.tool = tool;
+                    self.cancel_pending();
+                    break;
+                }
+            }
+        }
+
+        // Level indicator & info
         let lvl_text = format!("Level: {} {}", self.level_num, if self.dirty { "*" } else { "" });
         draw_text(&lvl_text, sw - 140.0, 28.0, 16.0, if self.dirty { YELLOW } else { WHITE });
         draw_text("ESC:cancel", sw - 280.0, 28.0, 12.0, GRAY);
@@ -709,6 +776,21 @@ impl EditorState {
         if self.status_timer > 0.0 {
             draw_rectangle(0.0, sh - 28.0, sw, 28.0, Color::new(0.0, 0.0, 0.0, 0.8));
             draw_text(&self.status, 8.0, sh - 6.0, 16.0, Color::new(0.7, 1.0, 0.7, 1.0));
+        }
+
+        // ── Save-As dialog ──
+        if self.save_as_mode {
+            let dialog_w = 500.0;
+            let dialog_h = 80.0;
+            let dx = (sw - dialog_w) / 2.0;
+            let dy = sh - 140.0;
+            draw_rectangle(dx, dy, dialog_w, dialog_h, Color::new(0.05, 0.05, 0.15, 1.0));
+            draw_rectangle_lines(dx, dy, dialog_w, dialog_h, 2.0, Color::new(0.3, 0.5, 0.9, 1.0));
+            draw_text("Save As — Enter path, then press Enter:", dx + 8.0, dy + 20.0, 14.0, GRAY);
+            draw_text(&self.save_path_buf, dx + 8.0, dy + 48.0, 18.0, WHITE);
+            // Blinking cursor
+            let cursor_x = dx + 8.0 + 10.0 * self.save_path_buf.len() as f32;
+            draw_line(cursor_x, dy + 32.0, cursor_x, dy + 56.0, 2.0, Color::new(1.0, 1.0, 0.0, 0.8));
         }
 
         // ── Mouse cursor crosshair ──
