@@ -49,7 +49,7 @@
 // that the test would catch (hardcoded values / field-swap / off-by-one / skip-validation)
 
 use mario_platformer::entities::player::{Player, PlayerConfig};
-use mario_platformer::level::{AABB, Level, Vec2};
+use mario_platformer::level::{AABB, Level, Tile, Vec2};
 
 // NEW types (expected to fail compilation — implementation not yet written):
 // - Enemy struct, EnemyConfig struct in src/entities/enemy.rs (current: empty file)
@@ -217,7 +217,7 @@ fn t01_fun_happy_patrol_right_reaches_waypoint_b_reverses() {
     assert!(approx_eq(enemy.vel.y, 0.0), "Enemy has no vertical velocity");
 
     // After 1.0s at 50 px/s, pos.x should be exactly at waypoint_b
-    enemy.update(1.0);
+    enemy.update(1.0, &[]);
 
     assert!(
         approx_eq(enemy.pos.x, 150.0),
@@ -256,12 +256,12 @@ fn t02_fun_happy_patrol_left_from_b_reaches_waypoint_a_reverses() {
     let mut enemy = enemy_at(100.0, 584.0, 50.0, 584.0, 150.0, 584.0);
 
     // Step 1: Move right to waypoint_b (1.0s)
-    enemy.update(1.0);
+    enemy.update(1.0, &[]);
     assert!(approx_eq(enemy.pos.x, 150.0), "Precondition: should reach waypoint_b");
     assert!(approx_eq(enemy.vel.x, -50.0), "Precondition: should reverse to left");
 
     // Step 2: Move left for 1.0s back toward waypoint_a
-    enemy.update(1.0);
+    enemy.update(1.0, &[]);
 
     // From 150.0 going left at 50 px/s for 1s → should reach 100.0
     assert!(
@@ -276,7 +276,7 @@ fn t02_fun_happy_patrol_left_from_b_reaches_waypoint_a_reverses() {
     );
 
     // Step 3: Continue left for another 1.0s to reach waypoint_a
-    enemy.update(1.0);
+    enemy.update(1.0, &[]);
 
     assert!(
         approx_eq(enemy.pos.x, 50.0),
@@ -316,7 +316,7 @@ fn t03_fun_happy_reaches_left_waypoint_reverses_to_right() {
 
     // One frame at speed=50, dt=1/15 ≈ 0.0667s → displacement ≈ 3.33 px
     // 52.0 - 3.33 = 48.67 → past waypoint_a (50.0) → should clamp to 50.0 and reverse
-    enemy.update(1.0 / 15.0);
+    enemy.update(1.0 / 15.0, &[]);
 
     assert!(
         approx_eq(enemy.pos.x, 50.0),
@@ -717,7 +717,7 @@ fn t11_bndry_edge_fp_overshoot_at_waypoint_triggers_reversal() {
         EnemyConfig::default(),
     );
 
-    enemy.update(DT);
+    enemy.update(DT, &[]);
 
     // pos.x should be clamped to waypoint_b (not left beyond it)
     assert!(
@@ -756,7 +756,7 @@ fn t12_bndry_edge_high_speed_overshoot_clamping() {
         EnemyConfig { speed: 300.0, bounce_velocity: -200.0 },
     );
 
-    enemy.update(1.0 / 15.0);
+    enemy.update(1.0 / 15.0, &[]);
 
     // Must clamp to waypoint_b exactly
     assert!(
@@ -853,7 +853,7 @@ fn t14_bndry_edge_zero_patrol_speed_no_panic() {
 
     // Multiple updates with zero speed — should not panic or change position
     for _ in 0..60 {
-        enemy.update(DT);
+        enemy.update(DT, &[]);
     }
 
     assert!(
@@ -1069,4 +1069,76 @@ fn t17_intg_state_playing_state_update_integrates_enemies() {
     for _ in 0..10 {
         state.update(DT);
     }
+}
+
+// ============================================================================
+// Cliff-edge detection tests (gravity + terrain)
+// ============================================================================
+
+/// Creates a simple ground platform AABB.
+fn ground_tile(x: f32, y: f32, w: f32) -> Tile {
+    Tile::Platform(AABB { x, y, w, h: 32.0 })
+}
+
+#[test]
+fn test_cliff_edge_reverses_direction() {
+    let terrain = vec![ground_tile(100.0, 600.0, 100.0)];
+
+    let mut enemy = Enemy::new(
+        Vec2 { x: 120.0, y: 600.0 },
+        Vec2 { x: 50.0, y: 600.0 },
+        Vec2 { x: 250.0, y: 600.0 },
+        EnemyConfig::default(),
+    );
+
+    // Run a few frames and check initial behavior
+    for i in 0..5 {
+        enemy.update(DT, &terrain);
+        eprintln!("Frame {}: pos=({:.2},{:.2}) vel=({:.2},{:.2})",
+            i, enemy.pos.x, enemy.pos.y, enemy.vel.x, enemy.vel.y);
+    }
+
+    // Enemy should be moving right on the platform
+    assert!(enemy.vel.x > 0.0, "Enemy should move right initially, vel.x={}", enemy.vel.x);
+    assert!((enemy.pos.y - 600.0).abs() < 2.0, "Enemy should be on platform, pos.y={}", enemy.pos.y);
+}
+
+#[test]
+fn test_has_ground_detects_platform_at_foot_level() {
+    // Enemy standing on a platform at y=600 → foot = 600.
+    // Probe at foot level (y=600) should detect the platform.
+    let terrain = vec![ground_tile(100.0, 600.0, 200.0)];
+
+    let mut enemy = Enemy::new(
+        Vec2 { x: 150.0, y: 600.0 },
+        Vec2 { x: 100.0, y: 600.0 },
+        Vec2 { x: 300.0, y: 600.0 },
+        EnemyConfig::default(),
+    );
+
+    // Simulate landing: apply gravity until on ground
+    for _ in 0..60 {
+        enemy.update(DT, &terrain);
+    }
+
+    // Enemy should be on platform (not fallen through)
+    assert!(
+        (enemy.pos.y - 600.0).abs() < 2.0,
+        "Enemy should land on platform at y=600, got y={}",
+        enemy.pos.y
+    );
+
+    // After landing, vel.y should be 0 (on ground)
+    assert!(
+        enemy.vel.y.abs() < 1.0,
+        "Enemy on ground should have vel.y ≈ 0, got {}",
+        enemy.vel.y
+    );
+
+    // Should be moving horizontally (not stuck flickering)
+    assert!(
+        enemy.vel.x.abs() > 0.0,
+        "Enemy should be patrolling, but vel.x = {}",
+        enemy.vel.x
+    );
 }

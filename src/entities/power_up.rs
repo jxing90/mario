@@ -35,6 +35,8 @@ pub enum PowerUpKind {
     FireFlower,
     /// Starman — bounces like a mushroom; grants temporary invincibility on contact.
     Starman,
+    /// 1-UP Mushroom — green with "1UP" text; increments player lives on contact.
+    OneUpMushroom,
 }
 
 /// A spawned PowerUp entity in the world.
@@ -62,7 +64,7 @@ impl PowerUp {
     /// - For FireFlower: `vel = (0.0, 0.0)` (stationary)
     pub fn new(kind: PowerUpKind, spawn_pos: Vec2) -> Self {
         let vel = match kind {
-            PowerUpKind::SuperMushroom | PowerUpKind::Starman => Vec2 {
+            PowerUpKind::SuperMushroom | PowerUpKind::Starman | PowerUpKind::OneUpMushroom => Vec2 {
                 x: BOUNCE_SPEED,
                 y: JUMP_VELOCITY,
             },
@@ -193,6 +195,12 @@ impl PowerUp {
             PowerUpKind::Starman => {
                 macroquad::shapes::draw_circle(px, py, half, macroquad::color::YELLOW);
                 macroquad::text::draw_text("*", px - half * 0.5, py + half * 0.5, half * 1.6, macroquad::color::BLACK);
+            }
+            PowerUpKind::OneUpMushroom => {
+                // Green cap with "1UP" text
+                macroquad::shapes::draw_rectangle(px - half, py - half, half * 2.0, half * 2.0, macroquad::color::GREEN);
+                macroquad::shapes::draw_rectangle(px - half, py + half * 0.3, half * 2.0, half * 0.7, macroquad::color::Color::new(0.95, 0.85, 0.7, 1.0));
+                macroquad::text::draw_text("1UP", px - half * 0.9, py + half * 0.6, half * 0.8, macroquad::color::BLACK);
             }
             PowerUpKind::Coin => {}
         }

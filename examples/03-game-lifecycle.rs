@@ -65,10 +65,13 @@ fn main() {
     // 模拟玩家在敌人侧面碰撞后死亡
     let player_pos = Vec2 { x: 300.0, y: 500.0 };
     let dead = DeadState::new(
-        2,           // lives: 死亡后剩余 2 条命（从 3 减 1）
-        10,          // coins: 保留金币数
-        None,        // checkpoint: 未激活检查点（从关卡起点重生）
-        player_pos,  // 死亡位置
+        2,          // lives: 死亡后剩余 2 条命（从 3 减 1）
+        10,         // coins: 保留金币数
+        1,          // current_level
+        None,       // checkpoint: 未激活检查点（从关卡起点重生）
+        player_pos, // 死亡位置
+        1280.0,     // screen_w
+        720.0,      // screen_h
     );
     println!("   DeadState 创建: lives={} coins={} death_timer={:.2}",
         dead.lives, dead.coins, dead.death_timer);
@@ -101,10 +104,12 @@ fn main() {
     println!("\n── 4. 游戏结束流程（生命归零） ──");
 
     let dead_govr = DeadState::new(
-        0,           // lives: 死亡后生命为 0
-        15,          // coins
-        None,        // checkpoint
+        0,    // lives: 死亡后生命为 0
+        15,   // coins
+        1,    // current_level
+        None, // checkpoint
         Vec2 { x: 500.0, y: 500.0 },
+        1280.0, 720.0,
     );
     let mut govr_state = GameState::Dead(dead_govr);
 

@@ -1129,10 +1129,10 @@ fn t20_collider_size_changes_with_powerup_state_foot_aligned() {
     player.state = PlayerState::Super;
     let super_collider = player.collider();
 
-    // Super: 16x32 (w unchanged, h doubled).
+    // Super: 32x32 (w and h both doubled).
     assert!(
-        approx_eq(super_collider.w, 16.0),
-        "T20: Super collider width must be 16 (unchanged). Got {}.",
+        approx_eq(super_collider.w, 32.0),
+        "T20: Super collider width must be 32. Got {}.",
         super_collider.w
     );
     assert!(
@@ -1339,19 +1339,19 @@ fn t25_apply_powerup_small_to_super() {
         player.state
     );
 
-    // Collider must update to 16x32.
+    // Collider must update to 32x32.
     let c = player.collider();
     assert!(
-        approx_eq(c.w, 16.0) && approx_eq(c.h, 32.0),
-        "T25: After powerup, collider must be 16x32. Got {}x{}.",
+        approx_eq(c.w, 32.0) && approx_eq(c.h, 32.0),
+        "T25: After powerup, collider must be 32x32. Got {}x{}.",
         c.w, c.h
     );
 
-    // Foot position must not change (pos.y unchanged).
+    // Foot position shifts down by height increase (pos.y += new_h - old_h = 16).
     assert!(
-        approx_eq(player.pos.y, pos_y_before),
-        "T25: pos.y must stay {} after powerup. Got {}.",
-        pos_y_before, player.pos.y
+        approx_eq(player.pos.y, pos_y_before + 16.0),
+        "T25: pos.y must shift down by 16 after powerup. Expected {}, got {}.",
+        pos_y_before + 16.0, player.pos.y
     );
 
     // Collider bottom must align with pos.y.
@@ -1654,4 +1654,123 @@ fn t31_integration_player_stands_on_real_level_platform() {
         "T31: After update, player foot must still be at platform surface. pos.y={}, platform.y={}.",
         player.pos.y, first_platform.y
     );
+}
+
+// ============================================================================
+// T34 — walk RIGHT into ground brick (LEFT edge) vs walk LEFT (RIGHT edge).
+// ============================================================================
+
+#[test]
+fn t34_walk_into_ground_brick_left_vs_right() {
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+    let ground = AABB { x: 0.0, y: 600.0, w: 700.0, h: 40.0 };
+    let brick = AABB { x: 300.0, y: 568.0, w: 32.0, h: 32.0 };
+    let terrain = vec![Tile::Platform(ground), Tile::Platform(brick)];
+
+    // Test A: walk RIGHT into brick's LEFT edge
+    player.pos = Vec2 { x: 290.0, y: 600.0 };
+    player.vel = Vec2 { x: 0.0, y: 0.0 };
+    player.on_ground = true;
+    let right_input = InputState { right: true, ..InputState::default() };
+    for _ in 0..20 {
+        player.update(DT, &right_input, &terrain);
+    }
+    let pr = player.pos.x + 8.0;
+    assert!(pr <= brick.x + POSITION_EPSILON,
+        "T34-A: right walk must stop at brick left. r={}, bx={}", pr, brick.x);
+    assert!(player.on_ground && approx_eq(player.pos.y, 600.0),
+        "T34-A: must stay on ground");
+
+    // Test B: walk LEFT into brick's RIGHT edge
+    player.pos = Vec2 { x: 340.0, y: 600.0 };
+    player.vel = Vec2 { x: 0.0, y: 0.0 };
+    player.on_ground = true;
+    let left_input = InputState { left: true, ..InputState::default() };
+    for _ in 0..20 {
+        player.update(DT, &left_input, &terrain);
+    }
+    let pl = player.pos.x - 8.0;
+    let br = brick.x + brick.w;
+    assert!(pl >= br - POSITION_EPSILON,
+        "T34-B: left walk must stop at brick right. l={}, br={}", pl, br);
+    assert!(player.on_ground && approx_eq(player.pos.y, 600.0),
+        "T34-B: must stay on ground");
+}
+
+// ============================================================================
+// T32 — ceiling when brick left edge between player center and right edge.
+// ============================================================================
+
+#[test]
+fn t32_brick_left_edge_between_center_and_right_ceiling_collision() {
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+    player.pos = Vec2 { x: 546.0, y: 484.0 };
+    player.vel = Vec2 { x: 200.0, y: -420.0 };
+    player.on_ground = false;
+    let brick = AABB { x: 550.0, y: 430.0, w: 32.0, h: 32.0 };
+    let terrain = platform_terrain(brick);
+    player.update(DT, &InputState::default(), &terrain);
+    assert!(player.vel.y >= -PHYSICS_EPSILON,
+        "T32: vel.y must be >= 0. Got {}", player.vel.y);
+    assert!(player.pos.y - 16.0 >= brick.y + brick.h - POSITION_EPSILON,
+        "T32: Must not pass through brick");
+    assert!(player.pos.x + 8.0 >= brick.x - POSITION_EPSILON,
+        "T32: Must not be pushed past brick left edge");
+}
+
+// ============================================================================
+// T33 — platform then brick (matches game terrain order).
+// ============================================================================
+
+#[test]
+fn t33_platform_before_brick_ceiling_left_side() {
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+    player.pos = Vec2 { x: 546.0, y: 484.0 };
+    player.vel = Vec2 { x: 200.0, y: -420.0 };
+    player.on_ground = false;
+    let platform = AABB { x: 550.0, y: 460.0, w: 120.0, h: 20.0 };
+    let brick = AABB { x: 550.0, y: 430.0, w: 32.0, h: 32.0 };
+    let terrain = vec![Tile::Platform(platform), Tile::Platform(brick)];
+    player.update(DT, &InputState::default(), &terrain);
+    assert!(player.vel.y >= -PHYSICS_EPSILON,
+        "T33: vel.y must be >= 0. Got {}", player.vel.y);
+    assert!(player.pos.y - 16.0 >= brick.y + brick.h - POSITION_EPSILON,
+        "T33: Must not pass through brick");
+    assert!(player.pos.x + 8.0 >= brick.x - POSITION_EPSILON,
+        "T33: Must not be pushed past brick left edge");
+}
+
+// ============================================================================
+// T35 — full level 1 terrain: walk right into brick at x=550 (ground level).
+// Uses the exact ground platform from level 1 (x=0,y=600,w=700,h=40).
+// ============================================================================
+
+#[test]
+fn t35_full_level1_terrain_walk_right_into_brick() {
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+    // Exact level 1 ground
+    let ground = AABB { x: 0.0, y: 600.0, w: 700.0, h: 40.0 };
+    // Brick at level 1 position (x=550, y=430) but moved to ground for test
+    let brick = AABB { x: 550.0, y: 568.0, w: 32.0, h: 32.0 };
+    let terrain = vec![Tile::Platform(ground), Tile::Platform(brick)];
+
+    player.pos = Vec2 { x: 540.0, y: 600.0 };
+    player.vel = Vec2 { x: 0.0, y: 0.0 };
+    player.on_ground = true;
+
+    let right_input = InputState { right: true, ..InputState::default() };
+    // Simulate walking for many frames
+    for _ in 0..30 {
+        player.update(DT, &right_input, &terrain);
+    }
+
+    let pr = player.pos.x + 8.0;
+    assert!(pr <= brick.x + POSITION_EPSILON + 1.0,
+        "T35: walking right must stop near brick left. right={}, bx={}", pr, brick.x);
+    assert!(player.on_ground,
+        "T35: must stay on ground after collision");
 }

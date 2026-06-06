@@ -19,6 +19,8 @@ pub struct InputState {
     pub jump_just: bool,
     /// Sprint modifier held (Shift).
     pub sprint: bool,
+    /// Crouch / duck (ArrowDown or S).
+    pub down: bool,
     /// Escape key just pressed (edge-triggered, for menu toggle).
     pub esc_just: bool,
     /// Confirm action key (Enter, edge-triggered).

@@ -47,7 +47,7 @@ fn main() {
     // 模拟巡逻几个周期
     for sec in 1..=5 {
         for _ in 0..60 {
-            enemy.update(dt);
+            enemy.update(dt, &[]);
         }
         println!("   {:.0}s 后: 位置=({:.0}, {:.0})  速度=({:.0}, {:.0})",
             sec as f32, enemy.pos.x, enemy.pos.y, enemy.vel.x, enemy.vel.y);

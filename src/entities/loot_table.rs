@@ -14,36 +14,33 @@ use crate::entities::power_up::PowerUpKind;
 /// # Probability Distribution (§4, §6)
 /// | Interval        | Reward        | Probability |
 /// |-----------------|---------------|-------------|
-/// | [0.00, 0.65)    | Coin          | 65%         |
-/// | [0.65, 0.80)    | SuperMushroom | 15%         |
-/// | [0.80, 0.95)    | FireFlower    | 15%         |
-/// | [0.95, 1.00]    | Starman       |  5%         |
+/// | [0.00, 0.60)    | Coin          | 60%         |
+/// | [0.60, 0.75)    | SuperMushroom | 15%         |
+/// | [0.75, 0.90)    | FireFlower    | 15%         |
+/// | [0.90, 0.95)    | Starman       |  5%         |
+/// | [0.95, 1.00]    | OneUpMushroom |  5%         |
 pub struct LootTable;
 
 impl LootTable {
     /// Deterministic roll using an externally-provided value in [0.0, 1.0].
     ///
     /// # Interval mapping (§4, §6)
-    /// - `val < 0.65` → `PowerUpKind::Coin`
-    /// - `0.65 <= val < 0.80` → `PowerUpKind::SuperMushroom`
-    /// - `0.80 <= val < 0.95` → `PowerUpKind::FireFlower`
-    /// - `0.95 <= val <= 1.00` → `PowerUpKind::Starman`
-    ///
-    /// # Boundary conditions (§Implementation Summary)
-    /// - `val = 0.00` → Coin (lower inclusive)
-    /// - `val = 0.65` → SuperMushroom (Coin upper exclusive)
-    /// - `val = 0.80` → FireFlower (Mushroom upper exclusive)
-    /// - `val = 0.95` → Starman (Flower upper exclusive)
-    /// - `val = 1.00` → Starman (upper inclusive)
+    /// - `val < 0.60` → `PowerUpKind::Coin`
+    /// - `0.60 <= val < 0.75` → `PowerUpKind::SuperMushroom`
+    /// - `0.75 <= val < 0.90` → `PowerUpKind::FireFlower`
+    /// - `0.90 <= val < 0.95` → `PowerUpKind::Starman`
+    /// - `0.95 <= val <= 1.00` → `PowerUpKind::OneUpMushroom`
     pub fn roll_with_value(val: f32) -> PowerUpKind {
-        if val < 0.65 {
+        if val < 0.60 {
             PowerUpKind::Coin
-        } else if val < 0.80 {
+        } else if val < 0.75 {
             PowerUpKind::SuperMushroom
-        } else if val < 0.95 {
+        } else if val < 0.90 {
             PowerUpKind::FireFlower
-        } else {
+        } else if val < 0.95 {
             PowerUpKind::Starman
+        } else {
+            PowerUpKind::OneUpMushroom
         }
     }
 }

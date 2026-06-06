@@ -85,7 +85,10 @@ impl PlayingState {
     /// Creates a PlayingState for a specific level number (1-4).
     pub fn with_level(player: Player, life_state: LifeState, level_num: u32) -> Self {
         let level = Level::load(level_num);
-        let camera = Camera::new(CameraConfig::default());
+        let mut cam_cfg = CameraConfig::default();
+        cam_cfg.viewport_w = 800.0;
+        cam_cfg.viewport_h = 380.0;
+        let camera = Camera::new(cam_cfg);
         let bounds = level.bounds();
 
         // Spawn flagpole from level config
@@ -215,15 +218,20 @@ impl PlayingState {
             self.flagpole.update(dt);
             if self.flagpole.phase == FlagpolePhase::Done {
                 return Some(GameState::Victory(VictoryState::new(
-                    self.player.coins, self.current_level,
+                    self.player.coins, self.player.lives,
+                    self.player.state, self.current_level,
                 )));
             }
             return None; // Input locked, no player update during slide
         }
 
-        // 3. Enemy patrol update (Step A: enemy.update(dt) for each living enemy)
+        // 3. Enemy patrol update (with terrain for gravity and cliff detection)
+        let enemy_terrain: Vec<crate::level::Tile> = self.level.platforms()
+            .iter()
+            .map(|p| crate::level::Tile::Platform(p.aabb))
+            .collect();
         for enemy in self.enemies.iter_mut() {
-            enemy.update(dt);
+            enemy.update(dt, &enemy_terrain);
         }
 
         // 3a. Brick particle update (broken brick debris animation)
@@ -285,7 +293,19 @@ impl PlayingState {
         // 4. Update player physics with real keyboard input at runtime.
         // During tests (screen_w == 0.0), use default (no input) to avoid
         // panicking in Macroquad's is_key_down() which requires a GL context.
-        let mut terrain = self.level.query_terrain(&self.player.collider());
+        //
+        // Build terrain with ALL level platforms unconditionally — not just
+        // those intersecting the player's current collider. query_terrain
+        // filtered by the PREVIOUS frame's position, so a platform the player
+        // moved into this frame would be missing and the collision would pass
+        // through. Also include spikes, question blocks, and bricks.
+        let mut terrain: Vec<crate::level::Tile> = self.level.platforms()
+            .iter()
+            .map(|p| crate::level::Tile::Platform(p.aabb))
+            .collect();
+        for spike in self.level.spikes() {
+            terrain.push(crate::level::Tile::Spike(spike.collider()));
+        }
         // Question blocks act as solid platforms (used or not)
         for block in &self.question_blocks {
             terrain.push(crate::level::Tile::Platform(block.collider()));
@@ -313,9 +333,7 @@ impl PlayingState {
             }
         }
 
-        // Breakable bricks (Super/Fire only)
-        // Same head-proximity fix as question blocks: vel.y check fails
-        // because ceiling collision zeroes it in the previous frame.
+        // Breakable bricks (Super/Fire only, must be hit from below)
         if !matches!(self.player.state, crate::entities::player::PlayerState::Small) {
             for brick in self.bricks.iter_mut() {
                 if brick.broken {
@@ -323,20 +341,20 @@ impl PlayingState {
                 }
                 let ba = brick.collider();
                 let block_bottom = ba.y + ba.h;
-                if player_aabb.intersects(&ba) && (player_aabb.y - block_bottom).abs() <= 4.0 {
+                if player_aabb.intersects(&ba)
+                    && (player_aabb.y - block_bottom).abs() <= 4.0
+                    && self.player.pos.y >= block_bottom
+                {
                     brick.shatter();
                     self.player.vel.y = 100.0;
                 }
             }
         }
 
-        // Question blocks
-        // Hit detection uses head-proximity instead of velocity check,
-        // because the previous frame's ceiling collision may have already
-        // zeroed vel.y (player head pushed to block bottom = vel.y=0).
-        // HEAD_TOLERANCE (4px) from Physics::question_block_check.
+        // Question blocks — only activate when hit from below
+        // Player's head must be at the block's bottom edge AND
+        // player's feet must be at or below the block (hit from below, not from side).
         const HEAD_TOLERANCE: f32 = 4.0;
-        // Generate random roll once per frame (used if a block is hit)
         let block_roll = self.next_rand();
         for block in self.question_blocks.iter_mut() {
             if !block.used {
@@ -344,21 +362,24 @@ impl PlayingState {
                 let block_bottom = ba.y + ba.h;
                 if player_aabb.intersects(&ba)
                     && (player_aabb.y - block_bottom).abs() <= HEAD_TOLERANCE
+                    && self.player.pos.y >= block_bottom
                 {
                     block.used = true;
                     self.player.vel.y = 100.0;
                     // Random roll from xorshift64 RNG (pre-generated before loop)
                     let roll = block_roll;
-                    if roll < 0.65 {
+                    if roll < 0.60 {
                         self.player.coins += 1;
                     } else {
                         // Spawn a PowerUp entity that bounces out of the block
-                        let kind = if roll < 0.80 {
+                        let kind = if roll < 0.75 {
                             PowerUpKind::SuperMushroom
-                        } else if roll < 0.95 {
+                        } else if roll < 0.90 {
                             PowerUpKind::FireFlower
-                        } else {
+                        } else if roll < 0.95 {
                             PowerUpKind::Starman
+                        } else {
+                            PowerUpKind::OneUpMushroom
                         };
                         let spawn_pos = Vec2 {
                             x: ba.x + ba.w / 2.0,
@@ -386,8 +407,11 @@ impl PlayingState {
                 return Some(GameState::Dead(DeadState::new(
                     self.player.lives,
                     self.player.coins,
+                    self.current_level,
                     self.life_state.checkpoint,
                     self.player.pos(),
+                    self.screen_w,
+                    self.screen_h,
                 )));
             }
             self.invuln_timer = 2.0; // ~2s invulnerability window
@@ -413,8 +437,11 @@ impl PlayingState {
                         return Some(GameState::Dead(DeadState::new(
                             self.player.lives,
                             self.player.coins,
+                            self.current_level,
                             self.life_state.checkpoint,
                             self.player.pos(),
+                            self.screen_w,
+                            self.screen_h,
                         )));
                     }
                     self.invuln_timer = 2.0;
@@ -438,6 +465,9 @@ impl PlayingState {
                     }
                     PowerUpKind::Starman => {
                         self.player.activate_star();
+                    }
+                    PowerUpKind::OneUpMushroom => {
+                        self.player.lives += 1;
                     }
                     PowerUpKind::Coin => {} // coins are handled separately
                 }
@@ -521,6 +551,7 @@ impl PlayingState {
             jump: jump_down,
             jump_just: jump_just_now || buffered_jump,
             sprint: is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift),
+            down: is_key_down(KeyCode::Down) || is_key_down(KeyCode::S),
             esc_just: is_key_pressed(KeyCode::Escape),
             confirm: is_key_pressed(KeyCode::Enter),
         }
@@ -680,10 +711,13 @@ impl PlayingState {
         let p = self.player.pos();
         let (spx, spy) = ws(p.x, p.y);
         let is_small = matches!(self.player.state, crate::entities::player::PlayerState::Small);
-        let body_h = if is_small { 16.0 } else { 32.0 };
-        let unit = body_h / 16.0; // scale factor: 1.0 for Small, 2.0 for Super/Fire
-        let sx_s = sx * unit;
-        let sy_s = sy * unit;
+        let body_w = if is_small { 16.0 } else { 32.0 };
+        // When crouching, the body height shrinks to 16 while width stays the same.
+        let body_h = if self.player.crouching { 16.0 } else { body_w };
+        // Vertical scale: uses actual body height. Horizontal scale: uses body width.
+        let unit_v = body_h / 16.0;
+        let sx_s = sx * body_w / 16.0;
+        let sy_s = sy * unit_v;
 
         // Invulnerability flicker (damage) & star power rainbow
         let flicker = self.invuln_timer > 0.0 && ((self.flicker_phase * 4.0) as u32) % 2 == 1;
@@ -708,8 +742,12 @@ impl PlayingState {
             let shoe_color = macroquad::color::Color::new(0.45, 0.25, 0.15, 1.0);
             let eye_color = macroquad::color::BLACK;
             let button_color = macroquad::color::YELLOW;
-            // Draw from foot upward: feet at pos.y, body extends up by body_h
+            // Draw from foot upward: feet at pos.y, body extends up by body_h.
+            // Offset spx left by half the body width so the sprite is centered
+            // on pos.x (matching the collider which is also centered on pos.x).
             let top = spy - body_h * sy;
+            // Center sprite on pos.x to match centered collider (x = pos.x - w/2).
+            let spx = spx - body_w / 2.0 * sx;
 
             // Hat (top 5 units)
             draw_rectangle(spx, top, 16.0 * sx_s, 5.0 * sy_s, hat_color);

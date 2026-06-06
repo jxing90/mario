@@ -70,16 +70,24 @@ impl Coin {
         use macroquad::shapes::draw_ellipse;
         use macroquad::text::draw_text;
         let (scx, scy) = ws(self.pos.x, self.pos.y);
-        let rx = 7.0 * sx;
-        let ry = 5.0 * sy; // slightly flattened → elliptical
+        let rx = 5.0 * sx;
+        let ry = 7.0 * sy; // vertical oval (coin seen from slight angle)
         // Outer yellow oval
         draw_ellipse(scx, scy, rx, ry, 0.0, Color::new(0.95, 0.80, 0.15, 1.0));
         // Inner dark yellow rim
         draw_ellipse(scx, scy, rx * 0.75, ry * 0.75, 0.0, Color::new(0.85, 0.65, 0.05, 1.0));
-        // "$" symbol in center
-        let font_size = 10.0 * sx.min(sy);
-        let text_w = font_size * 0.5;
-        let text_h = font_size * 0.7;
-        draw_text("$", scx - text_w, scy + text_h, font_size, Color::new(0.9, 0.75, 0.1, 1.0));
+        // "$" symbol centered inside the inner oval
+        let font_size = 7.0 * sx.min(sy);
+        // draw_text positions from top-left; $ is ~0.55 wide, ~1.0 tall
+        let tx = scx - font_size * 0.28;
+        let ty = scy - font_size * 0.50;
+        // Black outline (4 offsets)
+        let outline = Color::new(0.1, 0.05, 0.0, 1.0);
+        draw_text("$", tx - 1.0, ty, font_size, outline);
+        draw_text("$", tx + 1.0, ty, font_size, outline);
+        draw_text("$", tx, ty - 1.0, font_size, outline);
+        draw_text("$", tx, ty + 1.0, font_size, outline);
+        // White center
+        draw_text("$", tx, ty, font_size, Color::new(1.0, 1.0, 1.0, 1.0));
     }
 }

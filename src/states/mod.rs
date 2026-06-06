@@ -102,6 +102,7 @@ impl StateMachine for GameState {
         let (sw, sh) = match self {
             GameState::LevelSelect(s) => (s.screen_w, s.screen_h),
             GameState::Playing(s) => (s.screen_w, s.screen_h),
+            GameState::Dead(s) => (s.screen_w, s.screen_h),
             GameState::Victory(s) => (s.screen_w, s.screen_h),
             GameState::GameOver(s) => (s.screen_w, s.screen_h),
             _ => (0.0, 0.0),

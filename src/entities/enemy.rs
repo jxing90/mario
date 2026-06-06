@@ -1,11 +1,12 @@
 // Feature #7: Patrol Enemy — Enemy entity and EnemyConfig
 // Design Reference: docs/features/7-patrol-enemy.md §4, §6, §8
 //
-// Enemy walks between two waypoints at constant speed (reverses at endpoints).
+// Enemy walks between two waypoints at constant speed, reverses at endpoints
+// and at cliff edges. Subject to gravity — falls when no platform is below.
 // Collision detection (stomp vs contact) is handled by Physics::enemy_check.
 // Event consumption (alive=false, player bounce, death trigger) is handled by PlayingState.
 
-use crate::level::{AABB, Vec2};
+use crate::level::{AABB, Tile, Vec2};
 
 // ============================================================================
 // EnemyConfig
@@ -34,10 +35,8 @@ impl Default for EnemyConfig {
 // Enemy
 // ============================================================================
 
-/// A patrol enemy that walks horizontally between two waypoints.
-///
-/// Does not interact with terrain (no gravity, no platform collision).
-/// Collision with the player is handled by `Physics::enemy_check`.
+/// A patrol enemy that walks horizontally between two waypoints, subject to
+/// gravity and terrain collision. Reverses direction at cliff edges.
 ///
 /// # Coordinate conventions
 /// - `pos` is the foot position (bottom-center of the collider), same as Player.
@@ -46,7 +45,7 @@ impl Default for EnemyConfig {
 pub struct Enemy {
     /// World-space foot position (bottom-center of 16x16 collider).
     pub pos: Vec2,
-    /// Current velocity (px/s). Y is always 0 (no vertical movement).
+    /// Current velocity (px/s).
     pub vel: Vec2,
     /// Whether this enemy is still alive. Dead enemies are skipped by collision detection.
     pub alive: bool,
@@ -62,6 +61,12 @@ pub struct Enemy {
 const COLLIDER_HALF_W: f32 = 8.0;
 /// Height of the enemy's 16x16 collider box (extends upward from foot position).
 const COLLIDER_H: f32 = 16.0;
+/// Gravity applied every frame (px/s^2).
+const GRAVITY: f32 = 900.0;
+/// Max fall speed to prevent tunneling.
+const MAX_FALL_SPEED: f32 = 600.0;
+/// Distance to probe ahead of the enemy for cliff detection.
+const EDGE_PROBE_OFFSET: f32 = 10.0;
 
 impl Enemy {
     /// Creates a new Enemy at the given foot position, patrolling between waypoints.
@@ -86,32 +91,129 @@ impl Enemy {
 
     /// Advances the enemy patrol by one fixed timestep.
     ///
-    /// # Postconditions (from §4 Interface Contract)
+    /// Applies gravity, moves horizontally, resolves terrain collisions,
+    /// and reverses direction at waypoints and cliff edges.
+    ///
+    /// # Postconditions
     /// - If `alive == false` → no-op.
-    /// - `pos.x += vel.x * dt`
-    /// - If `pos.x >= waypoint_b.x` AND `vel.x > 0.0`:
-    ///   `vel.x = -config.speed`, `pos.x = waypoint_b.x` (clamped)
-    /// - If `pos.x <= waypoint_a.x` AND `vel.x < 0.0`:
-    ///   `vel.x = config.speed`, `pos.x = waypoint_a.x` (clamped)
-    /// - Y coordinate never changes.
-    pub fn update(&mut self, dt: f32) {
+    /// - `pos` updated by velocity and terrain resolution.
+    /// - Direction reversed at waypoints or if cliff edge detected ahead.
+    pub fn update(&mut self, dt: f32, terrain: &[Tile]) {
         if !self.alive {
             return;
         }
 
-        self.pos.x += self.vel.x * dt;
+        // 1. Apply gravity (only when terrain is provided)
+        if !terrain.is_empty() {
+            self.vel.y += GRAVITY * dt;
+            if self.vel.y > MAX_FALL_SPEED {
+                self.vel.y = MAX_FALL_SPEED;
+            }
+        }
 
-        // Check right waypoint boundary (moving right)
+        // 2. Integrate position
+        let new_x = self.pos.x + self.vel.x * dt;
+        let new_y = self.pos.y + self.vel.y * dt;
+
+        // 3. Cliff edge detection: probe ahead in movement direction
+        let dir = if self.vel.x > 0.0 { 1.0 } else { -1.0 };
+        let at_cliff = if terrain.is_empty() {
+            false // no terrain = no cliff (legacy patrol behavior)
+        } else {
+            let probe_x = self.pos.x + dir * EDGE_PROBE_OFFSET;
+            let probe_foot = Vec2 { x: probe_x, y: self.pos.y };
+            let ahead = Self::has_ground_at(probe_foot, terrain);
+            let current_foot = Vec2 { x: self.pos.x, y: self.pos.y };
+            let on_platform = Self::has_ground_at(current_foot, terrain);
+            on_platform && !ahead // cliff: standing on ground, none ahead
+        };
+
+        // 4. Horizontal movement with wall collision
+        let mut resolved_x = new_x;
+        let col = AABB {
+            x: new_x - COLLIDER_HALF_W,
+            y: self.pos.y - COLLIDER_H,
+            w: 16.0,
+            h: COLLIDER_H,
+        };
+        for tile in terrain {
+            if let Tile::Platform(p) = tile {
+                if col.intersects(p)
+                    // Skip if enemy is standing ON this platform (vertical overlap only)
+                    && (self.pos.y - p.y).abs() > 2.0
+                {
+                    if self.vel.x > 0.0 {
+                        resolved_x = p.x - COLLIDER_HALF_W;
+                    } else if self.vel.x < 0.0 {
+                        resolved_x = p.x + p.w + COLLIDER_HALF_W;
+                    }
+                    self.vel.x = -self.vel.x;
+                    break;
+                }
+            }
+        }
+        self.pos.x = resolved_x;
+
+        // 5. Waypoint reversal
         if self.pos.x >= self.waypoint_b.x && self.vel.x > 0.0 {
             self.vel.x = -self.config.speed;
             self.pos.x = self.waypoint_b.x;
         }
-
-        // Check left waypoint boundary (moving left)
         if self.pos.x <= self.waypoint_a.x && self.vel.x < 0.0 {
             self.vel.x = self.config.speed;
             self.pos.x = self.waypoint_a.x;
         }
+
+        // 6. Cliff edge reversal: turn around if standing on platform with no ground ahead
+        if at_cliff && self.vel.y >= 0.0 {
+            self.vel.x = -self.vel.x;
+            self.pos.x -= dir * 4.0;
+        }
+
+        // 7. Vertical movement with ground collision
+        let col2 = AABB {
+            x: self.pos.x - COLLIDER_HALF_W,
+            y: new_y - COLLIDER_H,
+            w: 16.0,
+            h: COLLIDER_H,
+        };
+        let mut on_ground = false;
+        for tile in terrain {
+            if let Tile::Platform(p) = tile {
+                if col2.intersects(p) {
+                    // Landing on top of platform
+                    if self.vel.y >= 0.0 {
+                        self.pos.y = p.y;
+                        self.vel.y = 0.0;
+                        on_ground = true;
+                        break;
+                    } else {
+                        // Hitting ceiling from below
+                        self.pos.y = p.y + p.h + COLLIDER_H;
+                        self.vel.y = 0.0;
+                        break;
+                    }
+                }
+            }
+        }
+        if !on_ground {
+            self.pos.y = new_y;
+        }
+    }
+
+    /// Checks if there is a platform tile directly at or slightly below the given world point.
+    /// A point has ground if there's a platform whose top surface is within 4px of the point.
+    fn has_ground_at(point: Vec2, terrain: &[Tile]) -> bool {
+        for tile in terrain {
+            if let Tile::Platform(p) = tile {
+                if point.x >= p.x && point.x <= p.x + p.w {
+                    if (p.y - point.y).abs() <= 4.0 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Returns the enemy's 16x16 collision box, anchored at the foot position.

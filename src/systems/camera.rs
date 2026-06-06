@@ -73,12 +73,12 @@ impl Camera {
         let target_x = player_pos.x - self.config.viewport_w * self.config.player_target_x_pct;
         self.offset.x += (target_x - self.offset.x) * self.config.h_convergence;
 
-        // Vertical dead zone: central dead_zone_pct of viewport
-        let dead_top = self.offset.y + self.config.viewport_h * (1.0 - self.config.dead_zone_pct) / 2.0;
-        let dead_bottom = self.offset.y + self.config.viewport_h * (1.0 + self.config.dead_zone_pct) / 2.0;
+        // Vertical: player stays in upper portion of screen (~35% from top)
+        let dead_top = self.offset.y + self.config.viewport_h * 0.10;
+        let dead_bottom = self.offset.y + self.config.viewport_h * 0.50;
 
         if player_pos.y < dead_top || player_pos.y > dead_bottom {
-            let target_y = player_pos.y - self.config.viewport_h / 2.0;
+            let target_y = player_pos.y - self.config.viewport_h * 0.35;
             self.offset.y += (target_y - self.offset.y) * self.config.v_convergence;
         }
 

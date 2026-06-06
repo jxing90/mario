@@ -111,6 +111,8 @@ pub struct Player {
     pub lives: u32,
     /// Remaining Starman invincibility time (seconds, 0.0 = inactive).
     pub star_timer: f32,
+    /// Whether the player is crouching (ducking).
+    pub crouching: bool,
     /// Previous-frame left key state for dual-key debounce (last-pressed priority).
     prev_left: bool,
     /// Previous-frame right key state for dual-key debounce (last-pressed priority).
@@ -144,6 +146,7 @@ impl Player {
             coins: 0,
             lives: 3,
             star_timer: 0.0,
+            crouching: false,
             prev_left: false,
             prev_right: false,
             dual_dir: 0.0,
@@ -170,7 +173,18 @@ impl Player {
             return;
         }
 
-        self.apply_horizontal(dt, input);
+        // Crouch: toggle on/off. Only Super/Fire can crouch; Small is unaffected.
+        // When crouching, collider height shrinks to 16px and horizontal input is blocked.
+        let can_crouch = !matches!(self.state, PlayerState::Small);
+        if can_crouch && input.down && self.on_ground {
+            self.crouching = true;
+        } else if !input.down || !self.on_ground {
+            self.crouching = false;
+        }
+
+        if !self.crouching {
+            self.apply_horizontal(dt, input);
+        }
         self.apply_jump(dt, input);
         self.apply_gravity(dt);
         self.resolve_terrain_collision(dt, terrain);
@@ -357,34 +371,55 @@ impl Player {
                     .min(overlap_top)
                     .min(overlap_bottom);
 
-                // Resolve based on direction of movement and minimum overlap axis
-                if min_overlap == overlap_bottom && self.vel.y < 0.0 {
-                    // Ceiling collision — player moving upward, head hits platform bottom
+                // Resolve based on minimum overlap axis.
+                // Disambiguate equal overlaps by movement direction:
+                // - Moving right: prefer left-side (wall) resolution
+                // - Moving left: prefer right-side (wall) resolution
+                // - Moving up (jumping, vel.y < 0): prefer bottom-side (ceiling)
+                // - Moving down / standing (vel.y >= 0): prefer top-side (floor)
+                //
+                // Also: only resolve floor collision when player's feet are at or
+                // below the platform top (prevents walking-into-wall → teleport-to-top).
+                let feet_at_platform = player_aabb.y + player_aabb.h >= platform_aabb.y;
+
+                // When jumping up into a block from below, force ceiling resolution
+                // regardless of which overlap is technically smallest. Without this,
+                // a player approaching a block from below at a slight horizontal offset
+                // can be pushed sideways by wall collision (because the larger vertical
+                // velocity causes deeper vertical penetration → overlap_bottom > overlap_left).
+                // The player then never reaches the hit-detection zone.
+                //
+                // Condition: moving upward AND the player is closer to the block's bottom
+                // than its top (overlap_bottom <= overlap_top means "below the midpoint").
+                if self.vel.y < 0.0 && overlap_bottom <= overlap_top {
                     self.vel.y = 0.0;
                     self.pos.y = platform_aabb.y + platform_aabb.h + player_h;
-                } else if min_overlap == overlap_top && self.vel.y >= 0.0 {
-                    // Floor collision — player landing on platform top
-                    self.vel.y = 0.0;
-                    self.on_ground = true;
-                    self.pos.y = platform_aabb.y; // foot aligned to platform surface
-                } else if min_overlap == overlap_left && self.vel.x > 0.0 {
-                    // Right-side wall — player moving right, hits wall from left
+                    continue;
+                }
+
+                if min_overlap == overlap_left && self.vel.x > 0.0 {
                     self.vel.x = 0.0;
                     self.pos.x = platform_aabb.x - player_w / 2.0;
                 } else if min_overlap == overlap_right && self.vel.x < 0.0 {
-                    // Left-side wall — player moving left, hits wall from right
                     self.vel.x = 0.0;
                     self.pos.x = platform_aabb.x + platform_aabb.w + player_w / 2.0;
-                } else if min_overlap == overlap_top {
-                    // Floor collision while vel.y < 0 (rare: ceiling+floor sandwich)
-                    // Prioritize floor — place player on top
+                } else if min_overlap == overlap_bottom && self.vel.y < 0.0 {
+                    // Ceiling collision — jumping into block from below
+                    self.vel.y = 0.0;
+                    self.pos.y = platform_aabb.y + platform_aabb.h + player_h;
+                } else if min_overlap == overlap_top && self.vel.y >= 0.0 && feet_at_platform {
+                    // Floor collision — landing on top
                     self.vel.y = 0.0;
                     self.on_ground = true;
                     self.pos.y = platform_aabb.y;
                 } else if min_overlap == overlap_bottom {
-                    // Ceiling collision while vel.y >= 0 (rare)
+                    // Ceiling collision (fallback)
                     self.vel.y = 0.0;
                     self.pos.y = platform_aabb.y + platform_aabb.h + player_h;
+                } else if min_overlap == overlap_top {
+                    self.vel.y = 0.0;
+                    self.on_ground = true;
+                    self.pos.y = platform_aabb.y;
                 } else if min_overlap == overlap_left {
                     self.vel.x = 0.0;
                     self.pos.x = platform_aabb.x - player_w / 2.0;
@@ -412,10 +447,16 @@ impl Player {
     // Helper: collider dimensions based on power-up state
     // ------------------------------------------------------------------
     fn collider_width(&self) -> f32 {
-        16.0
+        match self.state {
+            PlayerState::Small => 16.0,
+            PlayerState::Super | PlayerState::Fire => 32.0,
+        }
     }
 
     fn collider_height(&self) -> f32 {
+        if self.crouching {
+            return 16.0;
+        }
         match self.state {
             PlayerState::Small => 16.0,
             PlayerState::Super | PlayerState::Fire => 32.0,
@@ -448,7 +489,7 @@ impl Player {
     ///
     /// Size depends on power-up state:
     /// - Small: 16 x 16
-    /// - Super / Fire: 16 x 32
+    /// - Super / Fire: 32 x 32
     pub fn collider(&self) -> AABB {
         let w = self.collider_width();
         let h = self.collider_height();
