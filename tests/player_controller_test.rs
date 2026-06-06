@@ -1774,3 +1774,51 @@ fn t35_full_level1_terrain_walk_right_into_brick() {
     assert!(player.on_ground,
         "T35: must stay on ground after collision");
 }
+
+// ============================================================================
+// T36 — collider dimensions must match visual render size for all states.
+// ============================================================================
+
+#[test]
+fn t36_collider_matches_render_size_all_states() {
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+    player.pos = Vec2 { x: 200.0, y: 500.0 };
+
+    // Small: 16x16
+    player.state = PlayerState::Small;
+    player.crouching = false;
+    let c = player.collider();
+    assert!(approx_eq(c.w, 16.0), "T36: Small w must be 16. Got {}", c.w);
+    assert!(approx_eq(c.h, 16.0), "T36: Small h must be 16. Got {}", c.h);
+    assert!(approx_eq(c.x + c.w / 2.0, player.pos.x), "T36: Small center != pos.x");
+
+    // Super: 32x32
+    player.state = PlayerState::Super;
+    player.crouching = false;
+    let c = player.collider();
+    assert!(approx_eq(c.w, 32.0), "T36: Super w must be 32. Got {}", c.w);
+    assert!(approx_eq(c.h, 32.0), "T36: Super h must be 32. Got {}", c.h);
+    assert!(approx_eq(c.x + c.w / 2.0, player.pos.x), "T36: Super center != pos.x");
+
+    // Crouching: 32x16
+    player.state = PlayerState::Super;
+    player.crouching = true;
+    let c = player.collider();
+    assert!(approx_eq(c.w, 32.0), "T36: Crouch w must stay 32. Got {}", c.w);
+    assert!(approx_eq(c.h, 16.0), "T36: Crouch h must be 16. Got {}", c.h);
+    assert!(approx_eq(c.x + c.w / 2.0, player.pos.x), "T36: Crouch center != pos.x");
+
+    // Fire: 32x32
+    player.state = PlayerState::Fire;
+    player.crouching = false;
+    let c = player.collider();
+    assert!(approx_eq(c.w, 32.0), "T36: Fire w must be 32. Got {}", c.w);
+    assert!(approx_eq(c.h, 32.0), "T36: Fire h must be 32. Got {}", c.h);
+
+    // Damage: back to 16x16
+    player.take_damage();
+    let c = player.collider();
+    assert!(approx_eq(c.w, 16.0), "T36: After damage w must be 16. Got {}", c.w);
+    assert!(approx_eq(c.h, 16.0), "T36: After damage h must be 16. Got {}", c.h);
+}
