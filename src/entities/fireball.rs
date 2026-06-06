@@ -87,4 +87,18 @@ impl Fireball {
     pub fn kill(&mut self) {
         self.alive = false;
     }
+
+    /// Draw the fireball on screen (8x8 orange-red fire orb with yellow center).
+    pub fn draw(&self, sx: f32, sy: f32, ws: &dyn Fn(f32, f32) -> (f32, f32)) {
+        use macroquad::shapes::draw_circle;
+        use macroquad::color::Color;
+        let (spx, spy) = ws(self.pos.x, self.pos.y);
+        let r = 4.0 * sx.min(sy);
+        // Outer orange glow
+        draw_circle(spx, spy, r, Color::new(1.0, 0.55, 0.0, 0.9));
+        // Inner bright yellow core
+        draw_circle(spx, spy, r * 0.5, Color::new(1.0, 0.95, 0.2, 1.0));
+        // Flicker effect: small white highlight
+        draw_circle(spx - r * 0.15, spy - r * 0.15, r * 0.2, Color::new(1.0, 1.0, 1.0, 0.6));
+    }
 }

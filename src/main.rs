@@ -5,8 +5,7 @@
 // window, creates the Playing state, and drives the fixed-timestep game loop.
 
 use mario_platformer::engine::{GameLoop, WindowConfig};
-use mario_platformer::entities::player::{Player, PlayerConfig};
-use mario_platformer::states::{GameState, LifeState, PlayingState};
+use mario_platformer::states::{GameState, LevelSelectState};
 
 fn window_conf() -> macroquad::window::Conf {
     macroquad::window::Conf {
@@ -20,14 +19,10 @@ fn window_conf() -> macroquad::window::Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    // Spawn player on the ground (level ground platform is at y=600)
-    let mut player = Player::new(PlayerConfig::default());
-    player.pos.y = 600.0; // feet on ground (rendering draws upward from pos.y)
-    player.on_ground = true;
-
-    let life_state = LifeState::new();
-    let playing = PlayingState::new(player, life_state);
-    let mut game_state = GameState::Playing(Box::new(playing));
+    let mut select = LevelSelectState::new();
+    select.screen_w = macroquad::window::screen_width();
+    select.screen_h = macroquad::window::screen_height();
+    let mut game_state = GameState::LevelSelect(select);
 
     let config = WindowConfig {
         width: 1280,
@@ -42,14 +37,6 @@ async fn main() {
             return;
         }
     };
-
-    // Pass actual window dimensions to PlayingState for render coordinate scaling.
-    // Must be set before the first frame; screen_width()/screen_height() are safe
-    // here because the Macroquad window is already initialized.
-    if let GameState::Playing(ref mut state) = game_state {
-        state.screen_w = macroquad::window::screen_width();
-        state.screen_h = macroquad::window::screen_height();
-    }
 
     game_loop.run(&mut game_state).await;
 }

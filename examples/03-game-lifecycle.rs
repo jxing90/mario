@@ -165,9 +165,9 @@ fn main() {
     // 模拟旗杆动画完成 → VictoryState
     playing.flagpole.phase = FlagpolePhase::Done;
     if playing.flagpole.phase == FlagpolePhase::Done {
-        let victory = VictoryState::new(playing.player.coins);
+        let victory = VictoryState::new(playing.player.coins, playing.current_level);
         println!("\n   [Victory!] 胜利画面");
-        println!("     收集金币数: {}", victory.coins);
+        println!("     关卡: 1-{}  收集金币数: {}", victory.level, victory.coins);
         println!("     提示: 'Press Space to Play Again'");
     }
 

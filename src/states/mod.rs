@@ -11,6 +11,7 @@ pub mod dead;
 pub mod game_over;
 pub mod victory;
 pub mod options;
+pub mod level_select;
 
 use crate::state::StateMachine;
 use crate::level::Vec2;
@@ -60,6 +61,7 @@ pub use playing::PlayingState;
 pub use dead::DeadState;
 pub use game_over::GameOverState;
 pub use victory::VictoryState;
+pub use level_select::LevelSelectState;
 
 /// Top-level game state machine.
 ///
@@ -67,6 +69,7 @@ pub use victory::VictoryState;
 /// State transitions are driven by each variant's `update` returning
 /// `Some(GameState)` to signal the next state.
 pub enum GameState {
+    LevelSelect(LevelSelectState),
     Playing(Box<PlayingState>),
     Dead(DeadState),
     GameOver(GameOverState),
@@ -97,6 +100,7 @@ impl StateMachine for GameState {
     fn update(&mut self, dt: f32) {
         // Preserve screen dimensions across state transitions
         let (sw, sh) = match self {
+            GameState::LevelSelect(s) => (s.screen_w, s.screen_h),
             GameState::Playing(s) => (s.screen_w, s.screen_h),
             GameState::Victory(s) => (s.screen_w, s.screen_h),
             GameState::GameOver(s) => (s.screen_w, s.screen_h),
@@ -104,6 +108,7 @@ impl StateMachine for GameState {
         };
 
         let transition = match self {
+            GameState::LevelSelect(state) => state.update(dt),
             GameState::Playing(state) => state.update(dt),
             GameState::Dead(state) => state.update(dt),
             GameState::GameOver(state) => state.update(dt),
@@ -115,6 +120,7 @@ impl StateMachine for GameState {
             *self = next;
             // Inject screen dimensions into new state
             match self {
+                GameState::LevelSelect(s) => { s.screen_w = sw; s.screen_h = sh; }
                 GameState::Playing(s) => { s.screen_w = sw; s.screen_h = sh; }
                 GameState::Victory(s) => { s.screen_w = sw; s.screen_h = sh; }
                 GameState::GameOver(s) => { s.screen_w = sw; s.screen_h = sh; }
@@ -125,6 +131,7 @@ impl StateMachine for GameState {
 
     fn render(&mut self, alpha: f32) {
         match self {
+            GameState::LevelSelect(state) => state.render(alpha),
             GameState::Playing(state) => state.render(alpha),
             GameState::Dead(state) => state.render(alpha),
             GameState::GameOver(state) => state.render(alpha),

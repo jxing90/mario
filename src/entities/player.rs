@@ -469,8 +469,15 @@ impl Player {
     /// # Side effects
     /// - Updates `self.state`
     /// - Recalculates collider size (16x16 → 16x32, foot-aligned)
+    /// - Adjusts foot position if new taller collider would overlap terrain above
     pub fn apply_powerup(&mut self, state: PlayerState) {
+        let old_h = self.collider_height();
         self.state = state;
+        let new_h = self.collider_height();
+        if new_h > old_h {
+            // Push feet down so the top of the new collider doesn't clip into ceiling
+            self.pos.y += new_h - old_h;
+        }
     }
 
     /// Processes damage taken by the player.

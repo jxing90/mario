@@ -7,6 +7,7 @@
 use crate::entities::coin::Coin;
 use crate::entities::enemy::{Enemy, EnemyConfig};
 use crate::entities::player::Player;
+use crate::entities::fireball::Fireball;
 use crate::entities::flagpole::{Flagpole, FlagpolePhase};
 use crate::entities::brick::Brick;
 use crate::entities::checkpoint::Checkpoint;
@@ -17,7 +18,7 @@ use crate::systems::camera::Camera;
 use crate::systems::camera::CameraConfig;
 use crate::systems::hud::HudRenderer;
 use crate::systems::physics::{CollisionEvent, Physics};
-use crate::states::{GameState, LifeState, VictoryState, GameOverState};
+use crate::states::{GameState, LifeState, VictoryState, GameOverState, DeadState};
 
 /// The main gameplay state — normal play, hazard detection, and flagpole/checkpoint logic.
 ///
@@ -43,6 +44,10 @@ pub struct PlayingState {
     pub question_blocks: Vec<QuestionBlock>,
     /// Spawned power-up entities (mushrooms, flowers) bouncing in the world.
     pub power_ups: Vec<PowerUp>,
+    /// Active fireball projectiles (Fire state only).
+    pub fireballs: Vec<Fireball>,
+    /// Fireball cooldown timer (seconds until next shot allowed).
+    fireball_cooldown: f32,
     /// Breakable bricks: when hit from below by Super/Fire Mario, they shatter.
     pub bricks: Vec<Brick>,
     /// Spawn positions for brick reset on death (bricks are restored).
@@ -57,6 +62,8 @@ pub struct PlayingState {
     prev_jump_down: bool,
     /// Jump input buffer: frames remaining until buffered jump expires.
     jump_buffer: u8,
+    /// Previous frame's sprint key state (for fireball edge detection).
+    prev_sprint_down: bool,
     pub hud: HudRenderer,
     pub screen_w: f32,
     pub screen_h: f32,
@@ -129,6 +136,8 @@ impl PlayingState {
             coins,
             question_blocks,
             power_ups: Vec::new(),
+            fireballs: Vec::new(),
+            fireball_cooldown: 0.0,
             bricks,
             brick_spawns,
             invuln_timer: 0.0,
@@ -137,6 +146,7 @@ impl PlayingState {
             frame_count: 0,
             prev_jump_down: false,
             jump_buffer: 0,
+            prev_sprint_down: false,
             hud: HudRenderer::new(),
             screen_w: 0.0,
             screen_h: 0.0,
@@ -216,11 +226,61 @@ impl PlayingState {
             enemy.update(dt);
         }
 
+        // 3a. Brick particle update (broken brick debris animation)
+        for brick in self.bricks.iter_mut() {
+            brick.update_particles(dt);
+        }
+
         // 3b. PowerUp physics update (gravity, bounce, terrain collision)
         for pu in self.power_ups.iter_mut() {
             let pu_terrain = self.level.query_terrain(&pu.collider());
             pu.update(dt, &pu_terrain);
         }
+
+        // 3c. Fireball cooldown timer
+        if self.fireball_cooldown > 0.0 {
+            self.fireball_cooldown -= dt;
+        }
+
+        // 3d. Fireball spawn: Shift edge-detect (only Fire state, max 2 on screen)
+        let sprint_down = self.screen_w > 0.0 && macroquad::input::is_key_down(macroquad::input::KeyCode::LeftShift);
+        let sprint_just_pressed = sprint_down && !self.prev_sprint_down;
+        self.prev_sprint_down = sprint_down;
+        let is_fire = matches!(self.player.state, crate::entities::player::PlayerState::Fire);
+        if sprint_just_pressed && is_fire && self.fireball_cooldown <= 0.0 && self.fireballs.len() < 2 {
+            let offset_x = self.player.facing as f32 * 12.0; // spawn ahead of player
+            let spawn_pos = Vec2 {
+                x: self.player.pos().x + offset_x,
+                y: self.player.pos().y - 8.0, // chest height
+            };
+            self.fireballs.push(Fireball::new(spawn_pos, self.player.facing));
+            self.fireball_cooldown = 0.35; // ~170ms cooldown, ~3 shots/sec
+        }
+
+        // 3e. Fireball update (move, lifetime)
+        for fb in self.fireballs.iter_mut() {
+            // Horizontal movement
+            fb.pos.x += fb.vel.x * dt;
+            fb.update(dt);
+        }
+        // Check fireball-enemy collisions
+        for fb in self.fireballs.iter_mut() {
+            if !fb.alive {
+                continue;
+            }
+            for enemy in self.enemies.iter_mut() {
+                if !enemy.alive {
+                    continue;
+                }
+                if fb.collider().intersects(&enemy.collider()) {
+                    fb.kill();
+                    enemy.kill();
+                    break;
+                }
+            }
+        }
+        // Clean up dead fireballs
+        self.fireballs.retain(|fb| fb.alive);
 
         // 4. Update player physics with real keyboard input at runtime.
         // During tests (screen_w == 0.0), use default (no input) to avoid
@@ -263,10 +323,8 @@ impl PlayingState {
                 }
                 let ba = brick.collider();
                 let block_bottom = ba.y + ba.h;
-                if player_aabb.intersects(&ba)
-                    && (player_aabb.y - block_bottom).abs() <= 4.0
-                {
-                    brick.broken = true;
+                if player_aabb.intersects(&ba) && (player_aabb.y - block_bottom).abs() <= 4.0 {
+                    brick.shatter();
                     self.player.vel.y = 100.0;
                 }
             }
@@ -322,8 +380,15 @@ impl PlayingState {
 
         if !events.is_empty() && self.invuln_timer <= 0.0 && self.player.star_timer <= 0.0 && self.player.lives > 0 {
             // take_damage(): true = fatal (Small dies), false = downgrade (Super/Fire → Small)
-            if self.player.take_damage() {
+            let fatal = self.player.take_damage();
+            if fatal {
                 self.player.lives -= 1;
+                return Some(GameState::Dead(DeadState::new(
+                    self.player.lives,
+                    self.player.coins,
+                    self.life_state.checkpoint,
+                    self.player.pos(),
+                )));
             }
             self.invuln_timer = 2.0; // ~2s invulnerability window
         }
@@ -342,8 +407,15 @@ impl PlayingState {
                     if self.invuln_timer <= 0.0 && self.player.star_timer <= 0.0 && self.player.lives > 0 =>
                 {
                     // take_damage(): true = fatal (Small dies), false = downgrade
-                    if self.player.take_damage() {
+                    let fatal = self.player.take_damage();
+                    if fatal {
                         self.player.lives -= 1;
+                        return Some(GameState::Dead(DeadState::new(
+                            self.player.lives,
+                            self.player.coins,
+                            self.life_state.checkpoint,
+                            self.player.pos(),
+                        )));
                     }
                     self.invuln_timer = 2.0;
                 }
@@ -597,6 +669,11 @@ impl PlayingState {
             pu.draw(sx, sy, &ws);
         }
 
+        // ── 8c. Fireballs ──
+        for fb in &self.fireballs {
+            fb.draw(sx, sy, &ws);
+        }
+
         // ── 9. Player (Mario) ──
         use macroquad::shapes::draw_circle;
         use macroquad::text::draw_text;
@@ -652,43 +729,55 @@ impl PlayingState {
             draw_rectangle(spx + 9.0 * sx_s, top + 14.0 * sy_s, 7.0 * sx_s, 2.0 * sy_s, shoe_color);
         }
 
-        // ── 10. HUD (screen-space overlay) ──
+        // ── 10. HUD (screen-space overlay, horizontal) ──
         let font_size = 14.0 * sx.min(sy);
         let stats = self.player.stats();
+        let y_pos = 12.0 * sy; // single row near top
+        
+        // Column 1: World
         draw_text(
             &format!("WORLD 1-{}", self.current_level),
             8.0,
-            22.0 * sy,
+            y_pos,
             font_size,
             macroquad::color::WHITE,
         );
+        // Column 2: Coins
         draw_text(
-            &format!("COINS:{}  LIVES:{}", stats.coins, stats.lives),
-            8.0,
-            40.0 * sy,
+            &format!("COINS {}", stats.coins),
+            150.0 * sx,
+            y_pos,
             font_size,
-            macroquad::color::WHITE,
+            macroquad::color::Color::new(1.0, 0.85, 0.0, 1.0),
         );
-        // Time countdown
+        // Column 3: Lives
+        draw_text(
+            &format!("LIVES {}", stats.lives),
+            280.0 * sx,
+            y_pos,
+            font_size,
+            macroquad::color::Color::new(1.0, 0.3, 0.3, 1.0),
+        );
+        // Column 4: Time
         let time_color = if self.time_remaining <= 60.0 {
             macroquad::color::Color::new(1.0, 0.2, 0.2, 1.0) // red when urgent
         } else {
             macroquad::color::WHITE
         };
         draw_text(
-            &format!("TIME:{}", self.time_remaining as u32),
-            8.0,
-            58.0 * sy,
+            &format!("TIME {}", self.time_remaining as u32),
+            430.0 * sx,
+            y_pos,
             font_size,
             time_color,
         );
-        // Star power countdown (only visible when active)
+        // Star power countdown (inline when active)
         if self.player.star_timer > 0.0 {
-            let star_color = macroquad::color::Color::new(1.0, 0.85, 0.0, 1.0); // gold
+            let star_color = macroquad::color::Color::new(1.0, 0.85, 0.0, 1.0);
             draw_text(
-                &format!("STAR:{:.1}", self.player.star_timer),
-                8.0,
-                76.0 * sy,
+                &format!("STAR {:.1}", self.player.star_timer),
+                560.0 * sx,
+                y_pos,
                 font_size,
                 star_color,
             );

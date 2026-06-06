@@ -134,6 +134,11 @@ impl Enemy {
         self.pos
     }
 
+    /// Immediately kills this enemy.
+    pub fn kill(&mut self) {
+        self.alive = false;
+    }
+
     /// Draws the enemy as a brown rectangle with eyes and feet.
     /// Only draws if alive.
     pub fn draw(
