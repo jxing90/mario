@@ -312,6 +312,7 @@ impl PlayingState {
             fb.update(dt);
         }
         // Check fireball-enemy collisions
+        let mut fb_killed_de = false;
         for fb in self.fireballs.iter_mut() {
             if !fb.alive {
                 continue;
@@ -326,6 +327,21 @@ impl PlayingState {
                     break;
                 }
             }
+            // Also check fireball-dart_enemy collisions
+            for de in self.dart_enemies.iter_mut() {
+                if !de.alive || !fb.alive {
+                    continue;
+                }
+                if fb.collider().intersects(&de.collider()) {
+                    fb.kill();
+                    de.kill();
+                    fb_killed_de = true;
+                    break;
+                }
+            }
+        }
+        if fb_killed_de {
+            self.sfx(SoundManager::play_stomp);
         }
         // Clean up dead fireballs
         self.fireballs.retain(|fb| fb.alive);
@@ -630,6 +646,63 @@ impl PlayingState {
                 _ => {}
             }
         }
+
+        // 7a. Dart enemy collision (stomp + contact, same logic as regular enemies)
+        {
+                let player_bottom_val = {
+                    let pc = self.player.collider();
+                    pc.y + pc.h
+                };
+                let prev_player_bottom = player_bottom_val - self.player.vel.y * dt;
+                let player_vy = self.player.vel.y;
+                let player_col = self.player.collider();
+                let mut stomped = false;
+                let mut damaged = false;
+                for (_i, de) in self.dart_enemies.iter_mut().enumerate() {
+                    if !de.alive {
+                        continue;
+                    }
+                    let de_col = de.collider();
+                    if !player_col.intersects(&de_col) {
+                        continue;
+                    }
+
+                    let enemy_top = de_col.y;
+                    let is_stomp = player_vy > 0.0 && prev_player_bottom <= enemy_top + 2.0;
+
+                    if is_stomp {
+                        de.kill();
+                        self.player.vel.y = -200.0;
+                        stomped = true;
+                    } else {
+                        damaged = true;
+                    }
+                }
+                if stomped {
+                    self.sfx(SoundManager::play_stomp);
+                }
+                if damaged && self.invuln_timer <= 0.0
+                    && self.player.star_timer <= 0.0
+                    && self.player.lives > 0
+                {
+                    let fatal = self.player.take_damage();
+                    if fatal {
+                        self.sfx(SoundManager::play_death);
+                        self.player.lives -= 1;
+                        return Some(GameState::Dead(DeadState::new(
+                            self.player.lives,
+                            self.player.coins,
+                            self.current_level,
+                            self.life_state.checkpoint,
+                            self.player.pos(),
+                            self.screen_w,
+                            self.screen_h,
+                        )));
+                    }
+                    self.invuln_timer = 2.0;
+                    self.sfx(SoundManager::play_damage);
+                }
+            }
 
         // 7b. PowerUp collection: check player overlap with each power-up
         let player_col = self.player.collider();

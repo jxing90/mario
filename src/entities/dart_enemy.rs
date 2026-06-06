@@ -1,7 +1,7 @@
 // Dart-throwing enemy — stationary turret that faces the player and throws darts.
 // Each dart is spawned externally by PlayingState when the shoot timer elapses.
 
-use crate::level::Vec2;
+use crate::level::{AABB, Vec2};
 
 /// Cooldown between dart throws (seconds).
 const SHOOT_COOLDOWN: f32 = 2.0;
@@ -73,6 +73,16 @@ impl DartEnemy {
     /// Immediately kills this enemy.
     pub fn kill(&mut self) {
         self.alive = false;
+    }
+
+    /// Returns a 16x16 AABB centered on the enemy's foot position.
+    pub fn collider(&self) -> AABB {
+        AABB {
+            x: self.pos.x - 8.0,
+            y: self.pos.y - 16.0,
+            w: 16.0,
+            h: 16.0,
+        }
     }
 
     /// Returns the dart spawn position (center of the enemy body).
