@@ -6,6 +6,8 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Tool {
+    Drag,
+    View,
     Platform,
     Spike,
     Coin,
@@ -22,6 +24,8 @@ pub(crate) enum Tool {
 
 impl Tool {
     pub(crate) const ALL: &[Tool] = &[
+        Tool::Drag,
+        Tool::View,
         Tool::Platform,
         Tool::Spike,
         Tool::Coin,
@@ -38,6 +42,8 @@ impl Tool {
 
     pub(crate) fn name(&self) -> &str {
         match self {
+            Tool::Drag => "Drag",
+            Tool::View => "View",
             Tool::Platform => "Platform",
             Tool::Spike => "Spike",
             Tool::Coin => "Coin",
@@ -55,6 +61,8 @@ impl Tool {
 
     pub(crate) fn shortcut(&self) -> &str {
         match self {
+            Tool::Drag => "D",
+            Tool::View => "V",
             Tool::Platform => "1",
             Tool::Spike => "2",
             Tool::Coin => "3",

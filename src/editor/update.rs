@@ -27,6 +27,8 @@ impl EditorState {
         if is_key_pressed(KeyCode::Key0) { self.tool = Tool::Flagpole; }
         if is_key_pressed(KeyCode::P) { self.tool = Tool::PlayerSpawn; }
         if is_key_pressed(KeyCode::Delete) || is_key_pressed(KeyCode::Backspace) { self.tool = Tool::Eraser; }
+        if is_key_pressed(KeyCode::D) { self.tool = Tool::Drag; }
+        if is_key_pressed(KeyCode::V) { self.tool = Tool::View; }
 
         // Pan: arrow keys
         let pan_speed = 400.0 * get_frame_time() / self.zoom;
@@ -163,20 +165,24 @@ impl EditorState {
         // --- Mouse ---
         let (mx, my) = mouse_position();
 
-        // Menu bar / dropdown click
+        // Single left-click event — check all targets in priority:
+        //   1. Menu bar / dropdown  2. Toolbar  3. Canvas (drag/place)
         if is_mouse_button_pressed(MouseButton::Left) {
+            // 1. Menu bar / dropdown
             let in_menu_bar = my < EditorState::MENU_H;
             let menu_is_open = self.menu_open.is_some();
+            let mut menu_handled = false;
             if in_menu_bar || menu_is_open {
                 if in_menu_bar {
                     for (i, &(hx, hy, hw, hh)) in self.menu_hdr_rects.iter().enumerate() {
                         if mx >= hx && mx <= hx + hw && my >= hy && my <= hy + hh {
                             self.menu_open = if self.menu_open == Some(i) { None } else { Some(i) };
-                            return;
+                            menu_handled = true;
+                            break;
                         }
                     }
                 }
-                if menu_is_open {
+                if !menu_handled && menu_is_open {
                     for (j, &(ix, iy, iw, ih)) in self.menu_item_rects.iter().enumerate() {
                         if mx >= ix && mx <= ix + iw && my >= iy && my <= iy + ih {
                             let menu_idx = self.menu_open.unwrap();
@@ -212,16 +218,51 @@ impl EditorState {
                             } else if !action.is_empty() {
                                 self.menu_action(&action);
                             }
-                            return;
+                            menu_handled = true;
+                            break;
                         }
                     }
-                    // Click outside dropdown — close it
-                    self.menu_open = None;
+                    if !menu_handled {
+                        // Click outside dropdown — close it
+                        self.menu_open = None;
+                        menu_handled = true;
+                    }
+                }
+                if menu_handled {
+                    return;
+                }
+            }
+
+            // 2. Toolbar
+            if my >= EditorState::MENU_H && my <= EditorState::HEADER_H {
+                for &(tool, rx, ry, rw, rh) in &self.tool_rects {
+                    if mx >= rx && mx <= rx + rw && my >= ry && my <= ry + rh {
+                        self.tool = tool;
+                        self.cancel_pending();
+                        return;
+                    }
+                }
+            }
+
+            // 3. Canvas: drag, view, erase, or place
+            if my > EditorState::HEADER_H {
+                let (wx, wy) = self.screen_to_world(mx, my);
+                if self.tool == Tool::Drag {
+                    // Drag mode: only move existing entities, never place new ones
+                    if let Some(target) = self.hit_test(wx, wy) {
+                        self.drag_target = Some(target);
+                        self.set_status("Drag to move. Right-click or Esc to cancel.");
+                    }
+                } else if self.tool == Tool::View {
+                    // View mode: no modifications; pan handled by left-drag below
+                } else if self.tool == Tool::Eraser {
+                    self.delete_at(wx, wy);
+                } else {
+                    self.place_at(wx, wy);
                 }
             }
         }
 
-        // ── Drag: move entity while mouse is held ──
         if let Some(target) = self.drag_target {
             let (wx, wy) = self.screen_to_world(mx, my);
             let (sx, sy) = self.snap_pos(wx, wy);
@@ -235,14 +276,6 @@ impl EditorState {
             } else {
                 self.drag_target = None; self.dirty = true; self.set_status("Entity moved.");
             }
-        } else {
-            if is_mouse_button_pressed(MouseButton::Left) && my > EditorState::HEADER_H {
-                let (wx, wy) = self.screen_to_world(mx, my);
-                if let Some(target) = self.hit_test(wx, wy) {
-                    self.drag_target = Some(target);
-                    self.set_status("Drag to move. Right-click or Esc to cancel.");
-                } else { self.place_at(wx, wy); }
-            }
         }
 
         // Delete on right click
@@ -251,11 +284,21 @@ impl EditorState {
             self.delete_at(wx, wy);
         }
 
-        // Pan with middle mouse drag
+        // Pan with middle mouse drag (always available)
         if is_mouse_button_down(MouseButton::Middle) {
             let dx = mouse_delta_position();
             self.cam_x -= dx.x / self.zoom;
             self.cam_y -= dx.y / self.zoom;
         }
+
+        // View mode: left-drag to pan canvas (manual delta from prev_mouse)
+        if self.tool == Tool::View && is_mouse_button_down(MouseButton::Left) && my > EditorState::HEADER_H {
+            let (pmx, pmy) = self.prev_mouse;
+            if pmx != 0.0 || pmy != 0.0 {
+                self.cam_x -= (mx - pmx) / self.zoom;
+                self.cam_y -= (my - pmy) / self.zoom;
+            }
+        }
+        self.prev_mouse = (mx, my);
     }
 }

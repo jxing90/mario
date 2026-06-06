@@ -36,6 +36,7 @@ pub struct EditorState {
     pub(crate) menu_open: Option<usize>,
     pub(crate) menu_hdr_rects: Vec<(f32, f32, f32, f32)>,
     pub(crate) menu_item_rects: Vec<(f32, f32, f32, f32)>,
+    pub(crate) prev_mouse: (f32, f32),
 }
 
 impl EditorState {
@@ -44,12 +45,20 @@ impl EditorState {
 
 impl Default for EditorState {
     fn default() -> Self {
+        // Load level 1 from disk on startup, fall back to default template.
+        let (data, num) = match std::fs::read_to_string("assets/levels/1.json") {
+            Ok(json) => match serde_json::from_str::<LevelData>(&json) {
+                Ok(d) => (d, 1u32),
+                Err(_) => (LevelData::default(), 1),
+            },
+            Err(_) => (LevelData::default(), 1),
+        };
         Self {
-            data: LevelData::default(),
-            level_num: 1,
+            data,
+            level_num: num,
             cam_x: 0.0, cam_y: 0.0,
             zoom: 1.0,
-            tool: Tool::Platform,
+            tool: Tool::View,
             grid_snap: true,
             screen_w: 1280.0, screen_h: 720.0,
             status: String::from("Editor ready. Menu or shortcuts to operate."),
@@ -64,6 +73,7 @@ impl Default for EditorState {
             menu_open: None,
             menu_hdr_rects: Vec::new(),
             menu_item_rects: Vec::new(),
+            prev_mouse: (0.0, 0.0),
         }
     }
 }
@@ -251,6 +261,8 @@ impl EditorState {
             Tool::Flagpole => { self.data.flagpole = Pos { x, y }; self.set_status("Flagpole moved."); }
             Tool::PlayerSpawn => { self.data.player_spawn = Pos { x, y }; self.set_status("Player spawn set."); }
             Tool::Eraser => { self.delete_at(x, y); }
+            Tool::Drag => {} // handled in update.rs, never reaches here
+            Tool::View => {} // no-op in View mode
         }
     }
 
@@ -333,8 +345,9 @@ mod tests {
     fn make_editor() -> EditorState {
         let mut e = EditorState::new();
         e.set_screen(1280.0, 720.0);
-        // Clear default platform so tests start clean
-        e.data.platforms.clear();
+        // Reset to empty data so tests start clean (default() now loads from disk).
+        e.data = LevelData::default();
+        e.data.platforms.clear(); // remove the default platform too
         e
     }
 
@@ -783,7 +796,7 @@ mod tests {
 
     #[test]
     fn test_tool_all_has_all_variants() {
-        assert_eq!(Tool::ALL.len(), 12);
+        assert_eq!(Tool::ALL.len(), 14);
     }
 
     #[test]
