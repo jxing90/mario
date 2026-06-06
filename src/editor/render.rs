@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use crate::editor::state::EditorState;
-use crate::editor::tool::Tool;
+use crate::editor::tool::{Tool, MENU_BAR};
 
 impl EditorState {
     pub fn render(&mut self) {
@@ -10,12 +10,62 @@ impl EditorState {
         let sh = self.screen_h;
         if sw <= 0.0 || sh <= 0.0 { return; }
 
+        // ── Menu Bar (top 24px) ──
+        self.menu_hdr_rects.clear();
+        draw_rectangle(0.0, 0.0, sw, EditorState::MENU_H, Color::new(0.08, 0.08, 0.14, 1.0));
+        let mut mx = 8.0f32;
+        let font_size = 14.0;
+        for (i, &(label, _items)) in MENU_BAR.iter().enumerate() {
+            let tw = font_size * label.len() as f32 * 0.55;
+            let bw = tw + 12.0;
+            let bh = EditorState::MENU_H - 2.0;
+            let is_open = self.menu_open == Some(i);
+            let (cmx, cmy) = mouse_position();
+            let hover = !is_open && cmx >= mx && cmx <= mx + bw && cmy >= 0.0 && cmy <= EditorState::MENU_H;
+            let bg = if is_open { Color::new(0.2, 0.3, 0.5, 1.0) }
+                else if hover { Color::new(0.18, 0.22, 0.35, 1.0) }
+                else { Color::new(0.08, 0.08, 0.14, 0.0) };
+            if is_open || hover { draw_rectangle(mx, 1.0, bw, bh, bg); }
+            draw_text(label, mx + 6.0, EditorState::MENU_H - 6.0, font_size,
+                if is_open { YELLOW } else { WHITE });
+            self.menu_hdr_rects.push((mx, 0.0, bw, EditorState::MENU_H));
+            mx += bw + 2.0;
+        }
+
+        // ── Toolbar (from MENU_H) ──
+        draw_rectangle(0.0, EditorState::MENU_H, sw, EditorState::TOOLBAR_H, Color::new(0.1, 0.1, 0.18, 1.0));
+        let mut tx = 8.0;
+        self.tool_rects.clear();
+        for &tool in Tool::ALL {
+            let label = format!("[{}] {}", tool.shortcut(), tool.name());
+            let fw = 12.0 * label.len() as f32 * 0.55;
+            let bw = fw + 6.0;
+            let bh = 32.0;
+            let (cmx, cmy) = mouse_position();
+            let hover = cmx >= tx - 2.0 && cmx <= tx + bw && cmy >= EditorState::MENU_H + 4.0 && cmy <= EditorState::MENU_H + 36.0;
+            let bg = if self.tool == tool { Color::new(0.3, 0.5, 0.9, 0.9) }
+                else if hover { Color::new(0.3, 0.35, 0.5, 0.8) }
+                else { Color::new(0.2, 0.2, 0.3, 0.7) };
+            draw_rectangle(tx - 2.0, EditorState::MENU_H + 4.0, bw, bh, bg);
+            draw_text(&label, tx, EditorState::MENU_H + 28.0, 14.0, WHITE);
+            self.tool_rects.push((tool, tx - 2.0, EditorState::MENU_H + 4.0, bw, bh));
+            tx += bw + 4.0;
+        }
+        draw_line(0.0, EditorState::HEADER_H, sw, EditorState::HEADER_H, 2.0, Color::new(0.3, 0.3, 0.5, 0.8));
+
+        // Level name & info
+        let lvl_text = format!("Level: {} {}", self.level_num, if self.dirty { "*" } else { "" });
+        draw_text(&lvl_text, sw - 140.0, EditorState::MENU_H + 28.0, 16.0, if self.dirty { YELLOW } else { WHITE });
+        let name_display = if self.data.name.is_empty() { "(no name)" } else { &self.data.name };
+        draw_text(name_display, sw - 350.0, EditorState::MENU_H + 28.0, 16.0, Color::new(0.6, 0.9, 1.0, 1.0));
+        draw_text("Ctrl+R:rename", sw - 500.0, EditorState::MENU_H + 28.0, 12.0, GRAY);
+
         // ── World-to-screen transform ──
         let cam_x = self.cam_x;
         let cam_y = self.cam_y;
         let zoom = self.zoom;
         let ws = |wx: f32, wy: f32| -> (f32, f32) {
-            ((wx - cam_x) * zoom, (wy - cam_y) * zoom + 40.0)
+            ((wx - cam_x) * zoom, (wy - cam_y) * zoom + EditorState::HEADER_H)
         };
 
         // ── Grid ──
@@ -25,7 +75,7 @@ impl EditorState {
             let start_x = (self.cam_x / EditorState::GRID).floor() * EditorState::GRID;
             let start_y = (self.cam_y / EditorState::GRID).floor() * EditorState::GRID;
             let end_x = self.cam_x + sw / self.zoom;
-            let end_y = self.cam_y + (sh - 40.0) / self.zoom;
+            let end_y = self.cam_y + (sh - EditorState::HEADER_H) / self.zoom;
             let mut gx = start_x;
             while gx <= end_x {
                 let (sx, sy1) = ws(gx, start_y);
@@ -53,11 +103,8 @@ impl EditorState {
         // ── Platforms ──
         for p in &self.data.platforms {
             let (px, py) = ws(p.x, p.y);
-            let c = if p.y >= 590.0 {
-                Color::new(0.25, 0.55, 0.15, 0.8)  // ground
-            } else {
-                Color::new(0.45, 0.28, 0.10, 0.8)  // platform
-            };
+            let c = if p.y >= 590.0 { Color::new(0.25, 0.55, 0.15, 0.8) }
+                else { Color::new(0.45, 0.28, 0.10, 0.8) };
             draw_rectangle(px, py, p.w * self.zoom, p.h * self.zoom, c);
         }
 
@@ -66,12 +113,8 @@ impl EditorState {
             let (sx, sy) = ws(s.x, s.y);
             let hw = 8.0 * self.zoom;
             let hh = 4.0 * self.zoom;
-            draw_triangle(
-                Vec2::new(sx, sy + hh),
-                Vec2::new(sx - hw, sy - hh),
-                Vec2::new(sx + hw, sy - hh),
-                Color::new(0.9, 0.2, 0.1, 0.9),
-            );
+            draw_triangle(Vec2::new(sx, sy + hh), Vec2::new(sx - hw, sy - hh), Vec2::new(sx + hw, sy - hh),
+                Color::new(0.9, 0.2, 0.1, 0.9));
         }
 
         // ── Coins ──
@@ -97,7 +140,6 @@ impl EditorState {
         for e in &self.data.enemies {
             let (ex, ey) = ws(e.x, e.y - 16.0);
             draw_rectangle(ex, ey, 16.0 * self.zoom, 16.0 * self.zoom, BROWN);
-            // Waypoint lines
             let (ax, ay) = ws(e.waypoint_a.x, e.waypoint_a.y);
             let (bx, by2) = ws(e.waypoint_b.x, e.waypoint_b.y);
             draw_line(ax, ay, bx, by2, 1.0, Color::new(1.0, 0.5, 0.0, 0.5));
@@ -112,11 +154,10 @@ impl EditorState {
 
         // ── Oscillating fireballs ──
         for o in &self.data.osc_fireballs {
-            let (ox, oy) = ws(o.x, o.top_y);
-            let (_, by) = ws(o.x, o.bottom_y);
-            draw_circle(ox, oy, 6.0 * self.zoom, Color::new(1.0, 0.5, 0.0, 0.8));
-            draw_circle(ox, by, 6.0 * self.zoom, Color::new(1.0, 0.3, 0.0, 0.5));
-            draw_line(ox, oy, ox, by, 1.0, Color::new(1.0, 0.4, 0.0, 0.4));
+            let (ox, oty) = ws(o.x, o.top_y);
+            let (_, oby) = ws(o.x, o.bottom_y);
+            draw_line(ox + 4.0 * self.zoom, oty, ox + 4.0 * self.zoom, oby, 1.0, Color::new(0.5, 0.3, 0.1, 0.5));
+            draw_circle(ox + 4.0 * self.zoom, oty, 6.0 * self.zoom, Color::new(1.0, 0.5, 0.1, 0.9));
         }
 
         // ── Checkpoints ──
@@ -136,7 +177,6 @@ impl EditorState {
         // ── Player spawn ──
         {
             let (sx, sy) = ws(self.data.player_spawn.x, self.data.player_spawn.y);
-            // Mario silhouette: red hat + blue overalls
             let sz = 12.0 * self.zoom;
             draw_rectangle(sx - sz * 0.5, sy - sz * 2.0, sz, sz * 0.3, RED);
             draw_rectangle(sx - sz * 0.5, sy - sz * 1.7, sz, sz * 0.4, Color::new(1.0, 0.75, 0.55, 1.0));
@@ -146,22 +186,20 @@ impl EditorState {
 
         // ── Pending placement preview ──
         if let Some((sx, sy)) = self.plat_start {
-            let (mx, my) = mouse_position();
-            if my > 40.0 {
-                let (wx, wy) = self.screen_to_world(mx, my);
+            let (mx2, my2) = mouse_position();
+            if my2 > EditorState::HEADER_H {
+                let (wx, wy) = self.screen_to_world(mx2, my2);
                 let (gx, gy) = self.snap_pos(wx, wy);
-                let rx = gx.min(sx);
-                let ry = gy.min(sy);
-                let rw = (gx - sx).abs();
-                let rh = (gy - sy).abs();
+                let rx = gx.min(sx); let ry = gy.min(sy);
+                let rw = (gx - sx).abs(); let rh = (gy - sy).abs();
                 let (prx, pry) = ws(rx, ry);
                 draw_rectangle_lines(prx, pry, rw * self.zoom, rh * self.zoom, 2.0, YELLOW);
             }
         }
         if let Some((sx, sy)) = self.enemy_start {
-            let (mx, my) = mouse_position();
-            if my > 40.0 {
-                let (wx, wy) = self.screen_to_world(mx, my);
+            let (mx3, my3) = mouse_position();
+            if my3 > EditorState::HEADER_H {
+                let (wx, wy) = self.screen_to_world(mx3, my3);
                 let (gx, gy) = self.snap_pos(wx, wy);
                 let (p1x, p1y) = ws(sx, sy);
                 let (p2x, p2y) = ws(gx, gy);
@@ -169,9 +207,9 @@ impl EditorState {
             }
         }
         if let Some((_sx, sy)) = self.osc_start {
-            let (mx, my) = mouse_position();
-            if my > 40.0 {
-                let (wx, wy) = self.screen_to_world(mx, my);
+            let (mx4, my4) = mouse_position();
+            if my4 > EditorState::HEADER_H {
+                let (wx, wy) = self.screen_to_world(mx4, my4);
                 let (gx, _) = self.snap_pos(wx, wy);
                 let (p1x, p1y) = ws(gx, sy);
                 let (p2x, p2y) = ws(gx, wy);
@@ -179,52 +217,54 @@ impl EditorState {
             }
         }
 
-        // ── Toolbar (top 40px, clickable) ──
-        draw_rectangle(0.0, 0.0, sw, 40.0, Color::new(0.1, 0.1, 0.18, 1.0));
-        let mut tx = 8.0;
-        self.tool_rects.clear();
-        for &tool in Tool::ALL {
-            let name = tool.name();
-            let sc = tool.shortcut();
-            let label = format!("[{}] {}", sc, name);
-            let fw = 12.0 * label.len() as f32 * 0.55;
-            let bw = fw + 6.0;
-            let bh = 32.0;
-            let (mx, my) = mouse_position();
-            let hover = mx >= tx - 2.0 && mx <= tx + bw && my >= 4.0 && my <= 36.0;
-            let bg = if self.tool == tool {
-                Color::new(0.3, 0.5, 0.9, 0.9)
-            } else if hover {
-                Color::new(0.3, 0.35, 0.5, 0.8)
-            } else {
-                Color::new(0.2, 0.2, 0.3, 0.7)
-            };
-            draw_rectangle(tx - 2.0, 4.0, bw, bh, bg);
-            draw_text(&label, tx, 28.0, 14.0, WHITE);
-            self.tool_rects.push((tool, tx - 2.0, 4.0, bw, bh));
-            tx += bw + 4.0;
-        }
+        // ── Dropdown menu ──
+        self.menu_item_rects.clear();
+        if let Some(menu_idx) = self.menu_open {
+            let items = MENU_BAR[menu_idx].1;
+            let dx = self.menu_hdr_rects[menu_idx].0;
+            let item_h = 22.0;
+            let item_font = 14.0;
 
-        // Toolbar separator line
-        draw_line(0.0, 40.0, sw, 40.0, 2.0, Color::new(0.3, 0.3, 0.5, 0.8));
-
-        // Toolbar click detection
-        if is_mouse_button_pressed(MouseButton::Left) {
-            let (mx, my) = mouse_position();
-            for &(tool, rx, ry, rw, rh) in &self.tool_rects {
-                if mx >= rx && mx <= rx + rw && my >= ry && my <= ry + rh {
-                    self.tool = tool;
-                    self.cancel_pending();
-                    break;
+            let display_items: Vec<(String, String)> = if menu_idx == 0 {
+                let mut v = Vec::new();
+                for &(label, act) in items {
+                    if act == "open_header" {
+                        let available = crate::level::list_levels();
+                        if available.is_empty() {
+                            v.push(("  (no levels)".into(), "".into()));
+                        } else {
+                            for (k, &lv) in available.iter().enumerate() {
+                                if k >= 12 { break; }
+                                let name = &crate::level::Level::load(lv).name;
+                                let short = if name.len() > 20 { &name[..20] } else { name };
+                                v.push((format!("  {}: {}", lv, short), format!("open:{}", k)));
+                            }
+                        }
+                    } else { v.push((label.into(), act.into())); }
                 }
+                v
+            } else {
+                items.iter().map(|(l, a)| (l.to_string(), a.to_string())).collect()
+            };
+
+            let max_w: f32 = display_items.iter().map(|(l, _)| item_font * l.len() as f32 * 0.6 + 40.0)
+                .fold(0.0, f32::max).max(180.0);
+            let total_h = display_items.len() as f32 * item_h;
+            let dy = EditorState::MENU_H;
+            draw_rectangle(dx, dy, max_w, total_h + 4.0, Color::new(0.12, 0.14, 0.25, 1.0));
+            draw_rectangle_lines(dx, dy, max_w, total_h + 4.0, 1.0, Color::new(0.3, 0.35, 0.5, 1.0));
+
+            for (j, (label, _action)) in display_items.iter().enumerate() {
+                let iy = dy + 2.0 + j as f32 * item_h;
+                let hover = {
+                    let (cmx, cmy) = mouse_position();
+                    cmx >= dx && cmx <= dx + max_w && cmy >= iy && cmy <= iy + item_h
+                };
+                if hover { draw_rectangle(dx, iy, max_w, item_h, Color::new(0.3, 0.5, 0.9, 0.6)); }
+                draw_text(label, dx + 6.0, iy + item_h - 4.0, item_font, if hover { YELLOW } else { WHITE });
+                self.menu_item_rects.push((dx, iy, max_w, item_h));
             }
         }
-
-        // Level indicator & info
-        let lvl_text = format!("Level: {} {}", self.level_num, if self.dirty { "*" } else { "" });
-        draw_text(&lvl_text, sw - 140.0, 28.0, 16.0, if self.dirty { YELLOW } else { WHITE });
-        draw_text("ESC:cancel", sw - 280.0, 28.0, 12.0, GRAY);
-        draw_text("G:grid", sw - 360.0, 28.0, 12.0, if self.grid_snap { WHITE } else { GRAY });
 
         // ── Status bar (bottom) ──
         if self.status_timer > 0.0 {
@@ -234,32 +274,51 @@ impl EditorState {
 
         // ── Save-As dialog ──
         if self.save_as_mode {
-            let dialog_w = 500.0;
-            let dialog_h = 80.0;
-            let dx = (sw - dialog_w) / 2.0;
-            let dy = sh - 140.0;
+            let dialog_w = 500.0; let dialog_h = 80.0;
+            let dx = (sw - dialog_w) / 2.0; let dy = sh - 140.0;
             draw_rectangle(dx, dy, dialog_w, dialog_h, Color::new(0.05, 0.05, 0.15, 1.0));
             draw_rectangle_lines(dx, dy, dialog_w, dialog_h, 2.0, Color::new(0.3, 0.5, 0.9, 1.0));
-            draw_text("Save As — Enter path, then press Enter:", dx + 8.0, dy + 20.0, 14.0, GRAY);
+            draw_text("Save As - Enter path, then press Enter:", dx + 8.0, dy + 20.0, 14.0, GRAY);
             draw_text(&self.save_path_buf, dx + 8.0, dy + 48.0, 18.0, WHITE);
-            // Blinking cursor
             let cursor_x = dx + 8.0 + 10.0 * self.save_path_buf.len() as f32;
             draw_line(cursor_x, dy + 32.0, cursor_x, dy + 56.0, 2.0, Color::new(1.0, 1.0, 0.0, 0.8));
         }
 
+        // ── Rename dialog ──
+        if self.rename_mode {
+            let dialog_w = 500.0; let dialog_h = 80.0;
+            let dx = (sw - dialog_w) / 2.0; let dy = sh - 250.0;
+            draw_rectangle(dx, dy, dialog_w, dialog_h, Color::new(0.05, 0.05, 0.15, 1.0));
+            draw_rectangle_lines(dx, dy, dialog_w, dialog_h, 2.0, Color::new(0.9, 0.6, 0.1, 1.0));
+            draw_text("Rename Level - Enter new name, then press Enter:", dx + 8.0, dy + 20.0, 14.0, GRAY);
+            draw_text(&self.name_buf, dx + 8.0, dy + 48.0, 18.0, WHITE);
+            let cursor_x = dx + 8.0 + 10.0 * self.name_buf.len() as f32;
+            draw_line(cursor_x, dy + 32.0, cursor_x, dy + 56.0, 2.0, Color::new(1.0, 1.0, 0.0, 0.8));
+        }
+
+        // ── Open File dialog ──
+        if self.open_file_mode {
+            let dialog_w = 500.0; let dialog_h = 80.0;
+            let dx = (sw - dialog_w) / 2.0; let dy = sh - 360.0;
+            draw_rectangle(dx, dy, dialog_w, dialog_h, Color::new(0.05, 0.05, 0.15, 1.0));
+            draw_rectangle_lines(dx, dy, dialog_w, dialog_h, 2.0, Color::new(0.2, 0.7, 0.3, 1.0));
+            draw_text("Open File - Enter path to level JSON, then press Enter:", dx + 8.0, dy + 20.0, 14.0, GRAY);
+            draw_text(&self.open_file_buf, dx + 8.0, dy + 48.0, 18.0, WHITE);
+            let cursor_x = dx + 8.0 + 10.0 * self.open_file_buf.len() as f32;
+            draw_line(cursor_x, dy + 32.0, cursor_x, dy + 56.0, 2.0, Color::new(1.0, 1.0, 0.0, 0.8));
+        }
+
         // ── Mouse cursor crosshair ──
-        let (mx, my) = mouse_position();
-        if my > 40.0 {
+        let (mx5, my5) = mouse_position();
+        if my5 > EditorState::HEADER_H {
             let (gx, gy) = self.snap_pos(
-                mx / self.zoom + self.cam_x,
-                (my - 40.0) / self.zoom + self.cam_y,
+                mx5 / self.zoom + self.cam_x,
+                (my5 - EditorState::HEADER_H) / self.zoom + self.cam_y,
             );
             let (csx, csy) = ws(gx, gy);
             draw_circle_lines(csx, csy, 4.0, 1.0, Color::new(1.0, 1.0, 1.0, 0.6));
-
-            // Show world coordinates
             let coord_text = format!("{:.0}, {:.0}", gx, gy);
-            draw_text(&coord_text, mx + 12.0, my - 4.0, 12.0, Color::new(1.0, 1.0, 1.0, 0.8));
+            draw_text(&coord_text, mx5 + 12.0, my5 - 4.0, 12.0, Color::new(1.0, 1.0, 1.0, 0.8));
         }
     }
 }

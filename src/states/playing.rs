@@ -448,14 +448,17 @@ impl PlayingState {
         if input.jump_just {
             self.sfx(SoundManager::play_jump);
         }
-        // 4a. Hit detection: check block/brick/coin overlap BEFORE terrain
-        // collision resolves and pushes the player away.
-        let player_aabb = self.player.collider();
 
-        // Coins
+        // 4a. Advance player position (forces + integration, no collision yet).
+        //     Check block / brick / coin AFTER movement so the player's head
+        //     actually enters the block before ceiling collision pushes it back.
+        self.player.advance_position(dt, &input);
+
+        // Coins — check with post-move collider
         let mut coin_collected = false;
+        let post_aabb = self.player.collider();
         for coin in self.coins.iter_mut() {
-            if !coin.collected && player_aabb.intersects(&coin.collider()) {
+            if !coin.collected && post_aabb.intersects(&coin.collider()) {
                 coin.collected = true;
                 self.player.coins += 1;
                 coin_collected = true;
@@ -474,9 +477,9 @@ impl PlayingState {
                 }
                 let ba = brick.collider();
                 let block_bottom = ba.y + ba.h;
-                if player_aabb.intersects(&ba)
-                    && player_aabb.y >= block_bottom - 4.0
-                    && player_aabb.y <= block_bottom
+                if post_aabb.intersects(&ba)
+                    && post_aabb.y >= block_bottom - 8.0
+                    && post_aabb.y <= block_bottom
                     && self.player.pos.y >= block_bottom
                     && self.player.pos.x > ba.x - 4.0
                     && self.player.pos.x < ba.x + ba.w + 4.0
@@ -492,16 +495,20 @@ impl PlayingState {
         }
 
         // Question blocks — only activate when hit from below.
-        const HEAD_TOLERANCE: f32 = 4.0;
+        // After advance_position, the player's collider CAN intersect the block
+        // (ceiling collision hasn't pushed them out yet).
+        // HEAD_TOLERANCE must cover per-frame displacement (~6px at 350px/s, 60fps)
+        // so the player's head doesn't skip the detection zone.
+        const HEAD_TOLERANCE: f32 = 8.0;
         let block_roll = self.next_rand();
         let mut block_hit = false;
         for block in self.question_blocks.iter_mut() {
             if !block.used {
                 let ba = block.collider();
                 let block_bottom = ba.y + ba.h;
-                if player_aabb.intersects(&ba)
-                    && player_aabb.y >= block_bottom - HEAD_TOLERANCE
-                    && player_aabb.y <= block_bottom
+                if post_aabb.intersects(&ba)
+                    && post_aabb.y >= block_bottom - HEAD_TOLERANCE
+                    && post_aabb.y <= block_bottom
                     && self.player.pos.y >= block_bottom
                     && self.player.pos.x > ba.x - 4.0
                     && self.player.pos.x < ba.x + ba.w + 4.0
@@ -537,9 +544,10 @@ impl PlayingState {
             self.sfx(SoundManager::play_bump);
         }
 
-        // 4b. Apply player physics AFTER hit detection (so blocks can be hit
-        // before terrain collision pushes the player away).
-        self.player.update(dt, &input, &terrain);
+        // 4b. Resolve terrain collisions (ceiling / wall / floor).
+        //     This pushes the player out of blocks after activation.
+        self.player.resolve_collisions(dt, &terrain);
+        self.player.update_facing_from_input(&input);
 
         // 5. Hazard check: if player is NOT invulnerable and hazards exist → damage
         let kill_y = self.level_bounds.kill_y;

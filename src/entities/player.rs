@@ -29,7 +29,7 @@ pub struct PlayerConfig {
     pub sprint_multiplier: f32,
     /// Fraction of ground acceleration available while airborne. Default: 0.6.
     pub air_control_factor: f32,
-    /// Downward acceleration due to gravity (px/s^2). Default: 900.0.
+    /// Downward acceleration due to gravity (px/s^2). Default: 1200.0.
     pub gravity: f32,
     /// Maximum downward speed (px/s). Prevents tunneling through thin platforms.
     /// Default: 600.0.
@@ -46,7 +46,7 @@ impl Default for PlayerConfig {
             max_jump_duration: 0.35,       // hold window for variable-height jump
             sprint_multiplier: 1.5,
             air_control_factor: 0.6,
-            gravity: 900.0,
+            gravity: 1200.0,
             max_fall_speed: 600.0,
         }
     }
@@ -187,7 +187,46 @@ impl Player {
         }
         self.apply_jump(dt, input);
         self.apply_gravity(dt);
+        // Integrate position from velocity (moved here from resolve_terrain_collision)
+        self.pos.x += self.vel.x * dt;
+        self.pos.y += self.vel.y * dt;
+        self.on_ground = false;
         self.resolve_terrain_collision(dt, terrain);
+        self.update_facing(input);
+    }
+
+    /// Apply input forces and integrate position. Does NOT resolve terrain.
+    /// Use this before block activation checks, then call resolve_collisions.
+    pub fn advance_position(&mut self, dt: f32, input: &InputState) {
+        if dt <= 0.0 { return; }
+
+        // Crouch toggle
+        let can_crouch = !matches!(self.state, PlayerState::Small);
+        if can_crouch && input.down && self.on_ground {
+            self.crouching = true;
+        } else if !input.down || !self.on_ground {
+            self.crouching = false;
+        }
+
+        if !self.crouching {
+            self.apply_horizontal(dt, input);
+        }
+        self.apply_jump(dt, input);
+        self.apply_gravity(dt);
+
+        // Integrate position from velocity (collision resolution runs separately)
+        self.pos.x += self.vel.x * dt;
+        self.pos.y += self.vel.y * dt;
+        self.on_ground = false;
+    }
+
+    /// Resolve terrain collisions (ceiling / wall / floor).
+    pub fn resolve_collisions(&mut self, _dt: f32, terrain: &[Tile]) {
+        self.resolve_terrain_collision(_dt, terrain);
+    }
+
+    /// Update facing direction from input.
+    pub fn update_facing_from_input(&mut self, input: &InputState) {
         self.update_facing(input);
     }
 
@@ -342,10 +381,8 @@ impl Player {
     // ------------------------------------------------------------------
     // resolve_terrain_collision — AABB collision detection and response
     // ------------------------------------------------------------------
-    fn resolve_terrain_collision(&mut self, dt: f32, terrain: &[Tile]) {
-        // Integrate position from current velocity
-        self.pos.x += self.vel.x * dt;
-        self.pos.y += self.vel.y * dt;
+    fn resolve_terrain_collision(&mut self, _dt: f32, terrain: &[Tile]) {
+        let _ = _dt; // position already integrated by caller
 
         // Reset on_ground — will be set true by floor collision
         self.on_ground = false;

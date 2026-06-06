@@ -282,7 +282,7 @@ impl LevelSelectState {
                     Color::new(0.25, 0.25, 0.25, 1.0), // dark
                     Color::new(0.50, 0.50, 0.15, 1.0), // olive
                 ];
-                let swatch = palette[(idx % palette.len())];
+                let swatch = palette[idx % palette.len()];
                 let m = 6.0;
                 draw_rectangle(x + m, y + m, tile_w - m * 2.0, tile_h * 0.50, swatch);
 

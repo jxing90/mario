@@ -414,10 +414,10 @@ fn t06_short_jump_reaches_approximately_40_percent_of_max_height() {
     );
 
     // Short jump height should be 35-50% of max height.
-    // v0=-350, g=980: short ≈ 61px, max hold ≈ 138px, ratio ≈ 44%.
+    // v0=-350, g=1200: short ≈ 46px, max hold ≈ 116px, ratio ≈ 40%.
     let jump_height_px = start_y - peak_y; // pixels risen (Y-down: start > peak)
-    let min_expected = 55.0; // ~40% of max (v0=350, no sustain ≈ 68px)
-    let max_expected = 95.0; // ~70% of max
+    let min_expected = 40.0; // ~35% of max
+    let max_expected = 55.0; // ~48% of max
     assert!(
         jump_height_px >= min_expected && jump_height_px <= max_expected,
         "T06: Short jump height should be ~40-50% of max (roughly {} to {} px), got {} px",
@@ -490,9 +490,10 @@ fn t07_max_jump_reaches_full_height_with_sustain() {
 
     let jump_height_px = start_y - peak_y;
     // Full max jump should be substantially higher than short tap.
+    // v0=-350, g=1200: max hold ≈ 115-125px.
     assert!(
-        jump_height_px > 130.0,
-        "T07: Max jump height should be > 130 px (full sustain), got {} px",
+        jump_height_px > 105.0,
+        "T07: Max jump height should be > 105 px (full sustain), got {} px",
         jump_height_px
     );
 
