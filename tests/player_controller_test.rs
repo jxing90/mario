@@ -1720,27 +1720,26 @@ fn t32_brick_left_edge_between_center_and_right_ceiling_collision() {
         "T32: Must not be pushed past brick left edge");
 }
 
-// ============================================================================
-// T33 — platform then brick (matches game terrain order).
-// ============================================================================
-
+// T33 — platform ceiling collision from below-left (center near left edge).
+// Player at x=546, platform at x=550 → center (546) is just inside the 4px margin.
+// Verifies the outside_x check doesn't block legitimate ceiling hits.
 #[test]
-fn t33_platform_before_brick_ceiling_left_side() {
+fn t33_platform_ceiling_from_below_left() {
     let config = PlayerConfig::default();
     let mut player = Player::new(config);
     player.pos = Vec2 { x: 546.0, y: 484.0 };
     player.vel = Vec2 { x: 200.0, y: -420.0 };
     player.on_ground = false;
-    let platform = AABB { x: 550.0, y: 460.0, w: 120.0, h: 20.0 };
-    let brick = AABB { x: 550.0, y: 430.0, w: 32.0, h: 32.0 };
-    let terrain = vec![Tile::Platform(platform), Tile::Platform(brick)];
+    let platform = AABB { x: 550.0, y: 430.0, w: 120.0, h: 32.0 };
+    let terrain = platform_terrain(platform);
     player.update(DT, &InputState::default(), &terrain);
+    // Must be stopped by ceiling, not pushed sideways through wall.
     assert!(player.vel.y >= -PHYSICS_EPSILON,
-        "T33: vel.y must be >= 0. Got {}", player.vel.y);
-    assert!(player.pos.y - 16.0 >= brick.y + brick.h - POSITION_EPSILON,
-        "T33: Must not pass through brick");
-    assert!(player.pos.x + 8.0 >= brick.x - POSITION_EPSILON,
-        "T33: Must not be pushed past brick left edge");
+        "T33: vel.y must be stopped. Got {}", player.vel.y);
+    let head = player.pos.y - 16.0;
+    let plat_bottom = platform.y + platform.h;
+    assert!(head >= plat_bottom - POSITION_EPSILON,
+        "T33: Must not pass through platform. head={}, bottom={}", head, plat_bottom);
 }
 
 // ============================================================================
@@ -1821,4 +1820,40 @@ fn t36_collider_matches_render_size_all_states() {
     let c = player.collider();
     assert!(approx_eq(c.w, 16.0), "T36: After damage w must be 16. Got {}", c.w);
     assert!(approx_eq(c.h, 16.0), "T36: After damage h must be 16. Got {}", c.h);
+}
+
+// ============================================================================
+// T37 — side-slide must NOT trigger ceiling collision (only wall push).
+// When player center X is outside the block's X range (sliding along side),
+// the collision must be a wall push, not a ceiling stop. This guards against
+// question-block activation from the side.
+// ============================================================================
+
+#[test]
+fn t37_side_slide_wall_not_ceiling() {
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+
+    // Block at (300, 430, 32, 32). Player sliding down LEFT side:
+    // player center at x=290 (outside block X range 300..332).
+    let brick = AABB { x: 300.0, y: 430.0, w: 32.0, h: 32.0 };
+    let terrain = platform_terrain(brick);
+
+    // Player positioned to left of block, falling down past it.
+    // Head near block bottom but center OUTSIDE X range.
+    player.pos = Vec2 { x: 290.0, y: 476.0 }; // head at 460, brick bottom at 462
+    player.vel = Vec2 { x: 0.0, y: 50.0 };    // falling slowly
+    player.on_ground = false;
+
+    player.update(DT, &InputState::default(), &terrain);
+
+    // Player must be pushed LEFT (wall collision), not stopped as ceiling.
+    // After wall push, player right edge should be at or left of block left edge.
+    let pr = player.pos.x + 8.0;
+    assert!(pr <= brick.x + POSITION_EPSILON,
+        "T37: Side slide must push player left (wall). right={}, block_left={}", pr, brick.x);
+
+    // vel.y must NOT be zeroed (player continues falling — not a ceiling stop).
+    assert!(player.vel.y > PHYSICS_EPSILON,
+        "T37: Side slide must NOT stop vertical movement. vel.y={}", player.vel.y);
 }

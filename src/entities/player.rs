@@ -391,7 +391,15 @@ impl Player {
                 //
                 // Condition: moving upward AND the player is closer to the block's bottom
                 // than its top (overlap_bottom <= overlap_top means "below the midpoint").
-                if self.vel.y < 0.0 && overlap_bottom <= overlap_top {
+                //
+                // Also: skip ceiling when player center X is outside the block's X range
+                // (sliding along the side, not hitting from below).
+                let player_center_x = self.pos.x;
+                // Allow center to be up to 4px outside the block's X edges
+                // (player can still be hitting from below with partial overlap).
+                let outside_x = player_center_x < platform_aabb.x - 4.0
+                    || player_center_x > platform_aabb.x + platform_aabb.w + 4.0;
+                if !outside_x && self.vel.y < 0.0 && overlap_bottom <= overlap_top {
                     self.vel.y = 0.0;
                     self.pos.y = platform_aabb.y + platform_aabb.h + player_h;
                     continue;
@@ -403,7 +411,7 @@ impl Player {
                 } else if min_overlap == overlap_right && self.vel.x < 0.0 {
                     self.vel.x = 0.0;
                     self.pos.x = platform_aabb.x + platform_aabb.w + player_w / 2.0;
-                } else if min_overlap == overlap_bottom && self.vel.y < 0.0 {
+                } else if !outside_x && min_overlap == overlap_bottom && self.vel.y < 0.0 {
                     // Ceiling collision — jumping into block from below
                     self.vel.y = 0.0;
                     self.pos.y = platform_aabb.y + platform_aabb.h + player_h;
@@ -412,7 +420,7 @@ impl Player {
                     self.vel.y = 0.0;
                     self.on_ground = true;
                     self.pos.y = platform_aabb.y;
-                } else if min_overlap == overlap_bottom {
+                } else if !outside_x && min_overlap == overlap_bottom {
                     // Ceiling collision (fallback)
                     self.vel.y = 0.0;
                     self.pos.y = platform_aabb.y + platform_aabb.h + player_h;

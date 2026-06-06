@@ -349,8 +349,8 @@ impl PlayingState {
                     && player_aabb.y >= block_bottom - 4.0
                     && player_aabb.y <= block_bottom
                     && self.player.pos.y >= block_bottom
-                    && self.player.pos.x > ba.x
-                    && self.player.pos.x < ba.x + ba.w
+                    && self.player.pos.x > ba.x - 4.0
+                    && self.player.pos.x < ba.x + ba.w + 4.0
                 {
                     brick.shatter();
                     self.player.vel.y = 100.0;
@@ -371,8 +371,8 @@ impl PlayingState {
                     && player_aabb.y >= block_bottom - HEAD_TOLERANCE
                     && player_aabb.y <= block_bottom
                     && self.player.pos.y >= block_bottom
-                    && self.player.pos.x > ba.x
-                    && self.player.pos.x < ba.x + ba.w
+                    && self.player.pos.x > ba.x - 4.0
+                    && self.player.pos.x < ba.x + ba.w + 4.0
                 {
                     block.used = true;
                     self.player.vel.y = 100.0;
