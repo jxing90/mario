@@ -522,6 +522,27 @@ impl EditorState {
         if is_key_pressed(KeyCode::F2) { self.load_level(2); }
         if is_key_pressed(KeyCode::F3) { self.load_level(3); }
         if is_key_pressed(KeyCode::F4) { self.load_level(4); }
+        if is_key_pressed(KeyCode::F5) { self.load_level(5); }
+        if is_key_pressed(KeyCode::F6) { self.load_level(6); }
+        if is_key_pressed(KeyCode::F7) { self.load_level(7); }
+        if is_key_pressed(KeyCode::F8) { self.load_level(8); }
+
+        // Ctrl+N: new blank level
+        if is_key_down(KeyCode::LeftControl) && is_key_pressed(KeyCode::N) {
+            self.data = LevelData::default();
+            // Auto-increment to next available level number
+            let mut n = 1u32;
+            while n <= 99 {
+                let path = format!("assets/levels/{}.json", n);
+                if std::fs::metadata(&path).is_err() {
+                    break;
+                }
+                n += 1;
+            }
+            self.level_num = n;
+            self.dirty = true;
+            self.set_status(&format!("New level {}. Ctrl+S to save.", n));
+        }
 
         // Save-as text input mode
         if self.save_as_mode {
