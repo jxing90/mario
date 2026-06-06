@@ -354,6 +354,9 @@ impl EditorState {
                     // Drag mode: only move existing entities, never place new ones
                     if let Some(target) = self.hit_test(wx, wy) {
                         self.drag_target = Some(target);
+                        // Store offset so entity keeps its grab point during drag
+                        let (ex, ey) = self.entity_pos(target);
+                        self.drag_offset = (ex - wx, ey - wy);
                         self.set_status("Drag to move. Right-click or Esc to cancel.");
                     }
                 } else if self.tool == Tool::View {
@@ -379,14 +382,19 @@ impl EditorState {
         if let Some(target) = self.drag_target {
             let (wx, wy) = self.screen_to_world(mx, my);
             let (sx, sy) = self.snap_pos(wx, wy);
+            // Apply stored offset so entity keeps its grab point
+            let (ox, oy) = self.drag_offset;
+            let fx = sx + ox;
+            let fy = sy + oy;
             if is_mouse_button_pressed(MouseButton::Right) || is_key_pressed(KeyCode::Escape) {
                 self.drag_target = None; self.set_status("Drag cancelled.");
             } else if is_mouse_button_released(MouseButton::Left) {
-                self.move_entity(target, sx, sy);
+                self.move_entity(target, fx, fy);
                 self.dirty = true; self.drag_target = None; self.set_status("Entity moved.");
             } else if is_mouse_button_down(MouseButton::Left) {
-                self.move_entity(target, sx, sy);
+                self.move_entity(target, fx, fy);
             } else {
+                self.move_entity(target, fx, fy);
                 self.drag_target = None; self.dirty = true; self.set_status("Entity moved.");
             }
         }

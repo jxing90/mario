@@ -32,6 +32,8 @@ pub struct EditorState {
     pub(crate) open_file_mode: bool,
     pub(crate) open_file_buf: String,
     pub(crate) drag_target: Option<DragTarget>,
+    /// Offset from entity origin to mouse position at drag start, in world coords.
+    pub(crate) drag_offset: (f32, f32),
     pub(crate) tool_rects: Vec<(Tool, f32, f32, f32, f32)>,
     pub(crate) menu_open: Option<usize>,
     pub(crate) menu_hdr_rects: Vec<(f32, f32, f32, f32)>,
@@ -75,6 +77,7 @@ impl Default for EditorState {
             rename_mode: false, name_buf: String::new(),
             open_file_mode: false, open_file_buf: String::new(),
             drag_target: None,
+            drag_offset: (0.0, 0.0),
             tool_rects: Vec::new(),
             menu_open: None,
             menu_hdr_rects: Vec::new(),
@@ -192,6 +195,23 @@ impl EditorState {
             DragTarget::Checkpoint(i) => { if let Some(cp) = self.data.checkpoints.get_mut(i) { cp.x = x; cp.y = y; } }
             DragTarget::PlayerSpawn => { self.data.player_spawn = Pos { x, y }; }
             DragTarget::Flagpole => { self.data.flagpole = Pos { x, y }; }
+        }
+    }
+
+    /// Returns the world-space origin position for an entity.
+    pub(crate) fn entity_pos(&self, target: DragTarget) -> (f32, f32) {
+        match target {
+            DragTarget::Platform(i) => self.data.platforms.get(i).map(|p| (p.x, p.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::Spike(i) => self.data.spikes.get(i).map(|s| (s.x, s.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::Coin(i) => self.data.coins.get(i).map(|c| (c.x, c.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::QuestionBlock(i) => self.data.question_blocks.get(i).map(|q| (q.x, q.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::Brick(i) => self.data.bricks.get(i).map(|b| (b.x, b.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::Enemy(i) => self.data.enemies.get(i).map(|e| (e.x, e.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::DartEnemy(i) => self.data.dart_enemies.get(i).map(|d| (d.x, d.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::OscFireball(i) => self.data.osc_fireballs.get(i).map(|o| (o.x, o.top_y)).unwrap_or((0.0, 0.0)),
+            DragTarget::Checkpoint(i) => self.data.checkpoints.get(i).map(|c| (c.x, c.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::PlayerSpawn => (self.data.player_spawn.x, self.data.player_spawn.y),
+            DragTarget::Flagpole => (self.data.flagpole.x, self.data.flagpole.y),
         }
     }
 
