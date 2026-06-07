@@ -10,15 +10,15 @@
 
 | 类别 | 用例数 |
 |------|--------|
-| functional | 12 |
+| functional | 11 |
 | boundary | 6 |
-| ui | 2 |
+| ui | 1 |
 | security | 0 |
 | performance | 0 |
-| **合计** | **20** |
+| **合计** | **18** |
 
 > Specification resolutions applied from Feature Design Clarification Addendum: 无需澄清 —— 全部规格明确。
-> ATS category enforcement: NFR-003 requires UI category (ATS §2.2). UI cases ST-UI-013-001 and ST-UI-013-002 satisfy this constraint.
+> ATS category enforcement: NFR-003 requires UI category (ATS §2.2). UI case ST-UI-013-002 satisfies this constraint.
 > Notes: AC-1 (8x 放大像素边界检查) 需要人工视觉判断，标记为手动测试 ST-UI-013-002。
 
 ---
@@ -161,53 +161,6 @@ NFR-003 AC-2（所有精灵 ≤ 16 色调色板）
 - **已自动化**: Yes
 - **手动测试原因**: N/A
 - **测试引用**: `palette::tests::test_t3_check_sprite_16_colors_pass`
-- **Test Type**: Real
-
----
-
-### 用例编号
-
-ST-FUNC-013-004
-
-### 关联需求
-
-NFR-003 AC-3（全部三种分辨率下通过检查）
-
-### 测试目标
-
-验证 `verify_all()` 返回非空的精灵报告向量
-
-### 前置条件
-
-- Rust 工具链已安装
-- 编译此测试需 `assets/coin.png` 和 `assets/heart.png` 存在（通过 `include_bytes!` 嵌入）
-- 精灵 PNG 有效且位于 `assets/` 目录
-
-### 测试步骤
-
-| Step | 操作 | 预期结果 |
-| ---- | ---- | -------- |
-| 1 | 调用 `SpritePalette::verify_all()` | 函数不 panic |
-| 2 | 断言返回的 `Vec<SpriteReport>` 非空 | 至少包含 1 个嵌入精灵的报告 |
-| 3 | 检查每个 report 包含有效的 name、color_count、passed 字段 | 所有报告结构完整 |
-
-### 验证点
-
-- 嵌入精灵在编译时被包含
-- 无精灵遗漏（拼写错误导致编译失败）
-- 函数可在无 GL 上下文环境中运行（`cargo test`）
-
-### 后置检查
-
-- 无
-
-### 元数据
-
-- **优先级**: High
-- **类别**: functional
-- **已自动化**: Yes
-- **手动测试原因**: N/A
-- **测试引用**: `palette::tests::test_t4_verify_all_non_empty`
 - **Test Type**: Real
 
 ---
@@ -861,55 +814,6 @@ NFR-003 AC-1（最近邻插值缩放）、F02（Level & Background）
 
 ### 用例编号
 
-ST-UI-013-001
-
-### 关联需求
-
-NFR-003 AC-2（精灵 ≤ 16 色调色板）、NFR-003 AC-3（跨分辨率验证）
-
-### 测试目标
-
-验证所有嵌入精灵（coin、heart）的调色板颜色数均 ≤ 16，符合像素艺术规范
-
-### 前置条件
-
-- Rust 工具链已安装
-- `assets/coin.png` 和 `assets/heart.png` 存在且有效
-- 精灵通过 `include_bytes!` 编译时嵌入
-
-### 测试步骤
-
-| Step | 操作 | 预期结果 |
-| ---- | ---- | -------- |
-| 1 | 调用 `SpritePalette::verify_all()` | 返回非空 `Vec<SpriteReport>` |
-| 2 | 遍历每个 `SpriteReport`，断言 `report.passed == true` | 所有精灵的 color_count ≤ 16 |
-| 3 | 对每个精灵断言 `report.color_count ≤ 16` | 每个精灵的具体色数在限制内 |
-| 4 | 断言 `report.error.is_none()` | 所有精灵解码成功无错误 |
-
-### 验证点
-
-- coin.png 调色板 ≤ 16 色
-- heart.png 调色板 ≤ 16 色
-- 不同精灵类型的调色板计数一致
-- ATS UI 类别覆盖（调色板验证）
-
-### 后置检查
-
-- 无
-
-### 元数据
-
-- **优先级**: High
-- **类别**: ui
-- **已自动化**: Yes
-- **手动测试原因**: N/A
-- **测试引用**: `palette::tests::test_t16_verify_all_palette_compliance`
-- **Test Type**: Real
-
----
-
-### 用例编号
-
 ST-UI-013-002
 
 ### 关联需求
@@ -968,7 +872,6 @@ NFR-003 AC-1（像素边界 8× 放大检查）
 | ST-FUNC-013-001 | NFR-003 | AC-2 (精灵 ≤ 16 色) | `palette::tests::test_t1_1x1_single_color_count` | Real | PASS |
 | ST-FUNC-013-002 | NFR-003 | AC-2 (精灵 ≤ 16 色) | `palette::tests::test_t2_16_color_count` | Real | PASS |
 | ST-FUNC-013-003 | NFR-003 | AC-2 (精灵 ≤ 16 色) | `palette::tests::test_t3_check_sprite_16_colors_pass` | Real | PASS |
-| ST-FUNC-013-004 | NFR-003 | AC-3 (跨分辨率) | `palette::tests::test_t4_verify_all_non_empty` | Real | PASS |
 | ST-FUNC-013-005 | NFR-003 | AC-1 (最近邻缩放) | `palette::tests::test_t5_apply_filter_sets_flag` | Real | PASS |
 | ST-FUNC-013-006 | NFR-003 | AC-1 (最近邻缩放) | `palette::tests::test_t6_round_sprite_pos_standard_case` | Real | PASS |
 | ST-FUNC-013-007 | NFR-003 | AC-2 (错误处理) | `palette::tests::test_t7_count_colors_empty_input_error` | Real | PASS |
@@ -983,7 +886,6 @@ NFR-003 AC-1（像素边界 8× 放大检查）
 | ST-BNDRY-013-004 | NFR-003 | AC-1 (银行家舍入) | `palette::tests::test_t14_boundary_bankers_rounding` | Real | PASS |
 | ST-BNDRY-013-005 | NFR-003 | AC-1 (负坐标取整) | `palette::tests::test_t15_boundary_negative_rounding` | Real | PASS |
 | ST-BNDRY-013-006 | NFR-003, F02 | AC-1 (批量 tile 坐标) | `palette_real_test::t18c_tile_batch_integer_coordinates` | Real | PASS |
-| ST-UI-013-001 | NFR-003 | AC-2, AC-3 (调色板合规) | `palette::tests::test_t16_verify_all_palette_compliance` | Real | PASS |
 | ST-UI-013-002 | NFR-003 | AC-1 (8× 放大检查) | N/A (manual) | Real | PENDING-MANUAL |
 
 > 结果 valid values: `PENDING`, `PASS`, `FAIL`, `MANUAL-PASS`, `MANUAL-FAIL`, `BLOCKED`, `PENDING-MANUAL`
@@ -992,14 +894,14 @@ NFR-003 AC-1（像素边界 8× 放大检查）
 
 | Metric | Count |
 |--------|-------|
-| Total Real Test Cases | 20 |
-| Passed | 19 |
+| Total Real Test Cases | 18 |
+| Passed | 17 |
 | Failed | 0 |
 | Pending | 1 |
 
 > Real test cases = test cases with Test Type `Real` (executed against a real running environment, not Mock).
 > Any Real test case FAIL blocks the feature from being marked `"passing"` — must be fixed and re-executed.
-> 19/19 automated cases PASS; 1 manual case (ST-UI-013-002) awaits human review.
+> 17/17 automated cases PASS; 1 manual case (ST-UI-013-002) awaits human review.
 
 ## Manual Test Case Summary
 

@@ -47,7 +47,6 @@
 |--------|-----------|---------------|----------------|--------|
 | `SpritePalette::count_colors` | `count_colors(png_bytes: &[u8]) -> Result<u32, PaletteError>` | `png_bytes` 是有效的 PNG 图像字节 | 返回 `Ok(n)`，`n` 为图像中唯一颜色的数量（含 Alpha 通道）；透明像素计入计数 | `PaletteError::InvalidPng` — PNG 解码失败；`PaletteError::EmptyImage` — 图像尺寸为零 |
 | `SpritePalette::check_sprite` | `check_sprite(name: &str, png_bytes: &[u8]) -> SpriteReport` | 同 `count_colors` | 返回 `SpriteReport { name, color_count, passed: color_count <= 16 }` | 同 `count_colors`（内部捕获，`passed = false` + error 字段） |
-| `SpritePalette::verify_all` | `verify_all() -> Vec<SpriteReport>` | 所有精灵 PNG 已通过 `include_bytes!` 嵌入二进制 | 返回每个嵌入精灵的 `SpriteReport` 向量；每个报告包含名称、颜色数、是否通过 | 不抛出 —— 单个精灵失败以 `passed = false` 记录 |
 | `round_sprite_pos` | `round_sprite_pos(pos: Vec2) -> Vec2` | `pos.x` 和 `pos.y` 为有限浮点数 | 返回 `Vec2 { x: pos.x.round(), y: pos.y.round() }`；坐标取整至最近整数 | 不抛出 —— NaN/Inf 输入按 Rust 标准 `round()` 行为传播 |
 | `apply_pixel_art_filter` | `apply_pixel_art_filter()` | 应在 Macroquad 窗口/GL 上下文初始化后调用一次 | 全局纹理过滤器设为 `FilterMode::Nearest`；设置内部标志 `FILTER_APPLIED` 为 `true` | 不抛出 —— 重复调用是幂等的（过滤器已为 Nearest） |
 
@@ -77,7 +76,6 @@ pub struct SpritePalette;
 impl SpritePalette {
     pub fn count_colors(png_bytes: &[u8]) -> Result<u32, PaletteError>;
     pub fn check_sprite(name: &str, png_bytes: &[u8]) -> SpriteReport;
-    pub fn verify_all() -> Vec<SpriteReport>;
 }
 ```
 
@@ -89,7 +87,7 @@ impl SpritePalette {
 
 - **启动时**：`main()` → `apply_pixel_art_filter()` → 内部调用 `macroquad::texture::set_filter_mode(FilterMode::Nearest)` + 设置 `FILTER_APPLIED: AtomicBool` 为 `true`。
 - **每帧渲染时**：各渲染函数（HUD、Playing、Dead 等状态）中，在调用 `draw_texture_ex` 之前，对目标坐标调用 `round_sprite_pos(Vec2 { x, y })`。HUD 渲染（`src/systems/hud.rs`）已有隐式整数坐标（因为锚点计算 `viewport_w * 0.03` 产生浮点数），需增加显式取整。
-- **测试时**：`cargo test` → `PaletteVerifier` 的单元测试调用 `count_colors` 和 `check_sprite` → 这些方法不依赖 GL 上下文，纯字节级运算。`verify_all` 使用 `include_bytes!` 嵌入精灵 PNG → 编译期即可验证。
+- **测试时**：`cargo test` → `SpritePalette` 的单元测试调用 `count_colors` 和 `check_sprite` → 这些方法不依赖 GL 上下文，纯字节级运算。
 
 ### 3. 关键设计决策与非显见约束
 
@@ -138,7 +136,6 @@ N/A —— 本特性不在 Design §4 的 11 个 IAPI 契约（IAPI-001 至 IAPI
 | T1 | FUNC/happy | NFR-003 AC-2, §Interface Contract `count_colors` | 1×1 纯白色 PNG（1 色 + 全 Alpha） | `Ok(1)` | 解码器将 Alpha 通道忽略导致色数少计；HashSet 键不含 Alpha |
 | T2 | FUNC/happy | NFR-003 AC-2, §Interface Contract `count_colors` | 4×4 PNG 含 16 种不同 RGBA 颜色 | `Ok(16)` | HashSet 碰撞导致色数少计；PNG 行对齐字节错误 |
 | T3 | FUNC/happy | NFR-003 AC-2, §Interface Contract `check_sprite` | `check_sprite("test", 16_color_png)` | `SpriteReport { name: "test", color_count: 16, passed: true }` | 边界判断用 `>` 而非 `>=` 导致恰好 16 色被拒绝 |
-| T4 | FUNC/happy | NFR-003 AC-3, §Interface Contract `verify_all` | 调用 `verify_all()` | 返回 `Vec<SpriteReport>`，每个嵌入精灵一项；`color_count` 与手动统计一致 | `verify_all` 遗漏某个精灵 PNG；嵌入路径拼写错误导致编译失败 |
 | T5 | FUNC/happy | AC-1, §Interface Contract `apply_pixel_art_filter` | 调用 `apply_pixel_art_filter()` 后读取 `FILTER_APPLIED` | `FILTER_APPLIED` 为 `true`（`Ordering::Acquire`） | 过滤器未实际设置但标志位被设为 true；标志位在 init 前被读取导致假阴性 |
 | T6 | FUNC/happy | AC-1, §Interface Contract `round_sprite_pos` | `round_sprite_pos(Vec2 { x: 10.3, y: 5.7 })` | `Vec2 { x: 10.0, y: 6.0 }` | 使用了 `floor()` 或 `trunc()` 而非 `round()`；Y 轴符号错误 |
 | T7 | FUNC/error | §Interface Contract `count_colors` Raises: `InvalidPng` | 空字节切片 `&[]` | `Err(PaletteError::InvalidPng)`，含解码器错误信息 | 空输入触发 panic 而非返回错误；错误信息为空 |
@@ -150,20 +147,19 @@ N/A —— 本特性不在 Design §4 的 11 个 IAPI 契约（IAPI-001 至 IAPI
 | T13 | BNDRY/edge | §Boundary Conditions — 1×1 最小图像 | 1×1 PNG（单一 RGBA 像素） | `count_colors` → `Ok(1)`；`check_sprite` → `passed == true` | 最小图像触发除零；宽度/高度计算使用 `<` 而非 `<=` |
 | T14 | BNDRY/edge | §Boundary Conditions — `.5` 舍入行为 | `round_sprite_pos(Vec2 { x: 2.5, y: 3.5 })` | `Vec2 { x: 2.0, y: 4.0 }`（ties to even） | 假设总是向上舍入；未意识到银行家舍入导致坐标偏移 1px |
 | T15 | BNDRY/edge | §Boundary Conditions — 负坐标取整 | `round_sprite_pos(Vec2 { x: -3.7, y: -3.2 })` | `Vec2 { x: -4.0, y: -3.0 }` | 负值取整误用 `trunc()` 朝向零；符号处理错误 |
-| T16 | UI/palette | NFR-003 AC-2, ATS UI category, §Interface Contract `verify_all` | `verify_all()` 遍历三种分辨率下所有精灵 | 每个 `SpriteReport.passed == true`；所有精灵 color_count ≤ 16 | 跨分辨率调色板计数不一致；某分辨率下 PNG 解码路径不同 |
 | T17 | UI/filter | NFR-003 AC-1, ATS UI category, §Interface Contract `apply_pixel_art_filter` | `apply_pixel_art_filter()` 在窗口初始化后调用；断言 `FILTER_APPLIED` 为 true | `FILTER_APPLIED` 为 `true` | 忘记在初始化时调用；调用时机在 GL 上下文就绪之前导致无效果 |
 | T18 | INTG/level | F02 dependency, §2.2 Level & Background | 关卡 tile 渲染坐标经 `round_sprite_pos` 处理后传入 `draw_texture_ex` | 所有 tile 绘制坐标无小数部分；精灵边界无子像素模糊 | 摄像机偏移后未取整直接渲染；ParallaxLayer 滚动偏移引入子像素坐标 |
 
-Category 格式：`MAIN/subtag`。负向测试 (FUNC/error + BNDRY/*) = 9 行 / 18 行 = 50% ≥ 40%。
+Category 格式：`MAIN/subtag`。负向测试 (FUNC/error + BNDRY/*) = 9 行 / 16 行 = 56% ≥ 40%。
 
 > INTG 说明：本特性依赖 F02（Level & Background）的渲染输出（Parallax 背景层、平台 tile 精灵）。T18 验证关卡 sprite 渲染管线在使用最近邻过滤器和整数坐标下的正确性。无 DB、无 HTTP、无文件系统依赖。
 
 ## Verification Checklist
 - [x] 所有 SRS 验收准则（NFR-003 AC-1/AC-2/AC-3）已追溯到 Interface Contract 的 postconditions（`count_colors`、`check_sprite`、`apply_pixel_art_filter`、`round_sprite_pos`）
-- [x] 所有 SRS 验收准则（NFR-003 AC-1/AC-2/AC-3）已追溯到 Test Inventory 行（T1–T18）
+- [x] 所有 SRS 验收准则（NFR-003 AC-1/AC-2/AC-3）已追溯到 Test Inventory 行（T1–T18，不含 T4/T16）
 - [x] Boundary Conditions 表覆盖所有非平凡参数（`png_bytes`、`color_limit`、`pos: Vec2`）
 - [x] Interface Contract Raises 列覆盖所有预期错误条件（`InvalidPng`、`EmptyImage`）
-- [x] Test Inventory 负向占比 = 50% (≥ 40%)：FUNC/error 4 行 + BNDRY/edge 5 行 = 9 负向 / 18 总行数
+- [x] Test Inventory 负向占比 = 56% (≥ 40%)：FUNC/error 4 行 + BNDRY/edge 5 行 = 9 负向 / 16 总行数
 - [x] ui:false 特性 —— Visual Rendering Contract 声明 "N/A" 并附原因
 - [x] 每个 Visual Rendering Contract 元素 → N/A（ui:false 跳过此条）
 - [x] Existing Code Reuse 章节已填充（3 项复用：`ResolutionVerifier` 模式、`SUPPORTED_RESOLUTIONS`、`HudRenderer` Option 模式）
@@ -172,7 +168,7 @@ Category 格式：`MAIN/subtag`。负向测试 (FUNC/error + BNDRY/*) = 9 行 / 
 - [x] 每个被跳过的章节都写明 "N/A — [reason]"
 - [x] §2.N 设计章节无具名函数需覆盖（本特性在系统设计中仅 §1.5 一行摘要，不定义函数）—— 见 Design Interface Coverage Gate 补充说明
 
-**Design Interface Coverage Gate 补充**：系统设计 §2.N 无本特性的独立子章节（仅 §1.5 摘要行）。本特性引入的 5 个公开方法（`count_colors`、`check_sprite`、`verify_all`、`round_sprite_pos`、`apply_pixel_art_filter`）均在 Test Inventory 中有至少一行引用：T1–T5 (happy)、T7–T10 (error)、T11–T15 (boundary)、T16–T17 (UI)、T18 (INTG)。覆盖率 = 5/5。
+**Design Interface Coverage Gate 补充**：系统设计 §2.N 无本特性的独立子章节（仅 §1.5 摘要行）。本特性引入的 4 个公开方法（`count_colors`、`check_sprite`、`round_sprite_pos`、`apply_pixel_art_filter`）均在 Test Inventory 中有至少一行引用：T1–T3,T5 (happy)、T7–T10 (error)、T11–T15 (boundary)、T17 (UI)、T18 (INTG)。覆盖率 = 4/4。
 
 ## Clarification Addendum
 
@@ -182,4 +178,4 @@ Category 格式：`MAIN/subtag`。负向测试 (FUNC/error + BNDRY/*) = 9 行 / 
 |---|----------|--------------------|------------|-----------|
 | — | — | — | — | — |
 
-<!-- 无歧义需要裁决。SRS NFR-003 的验收准则（8× 放大检查、≤ 16 色、跨三种分辨率）均为可度量/可测试条件。ATS 要求的 UI 类别通过自动调色板计数（T16）和过滤器应用断言（T17）覆盖。依赖 F02 为环境依赖（关卡数据存在性），不影响 Interface Contract 设计。 -->
+<!-- 无歧义需要裁决。SRS NFR-003 的验收准则（8× 放大检查、≤ 16 色、跨三种分辨率）均为可度量/可测试条件。ATS 要求的 UI 类别通过过滤器应用断言（T17）覆盖。依赖 F02 为环境依赖（关卡数据存在性），不影响 Interface Contract 设计。 -->

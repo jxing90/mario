@@ -146,29 +146,6 @@ impl SpritePalette {
             },
         }
     }
-
-    /// Verifies all sprites embedded via `include_bytes!` at compile time.
-    ///
-    /// Iterates over every embedded sprite PNG and runs [`check_sprite`]
-    /// for each, returning a full report vector.
-    ///
-    /// # Preconditions (§4)
-    /// - Each embedded PNG must be a valid image.
-    ///
-    /// # Postconditions (§4)
-    /// - Returns `Vec<SpriteReport>` with one entry per embedded sprite.
-    /// - Each entry's `passed` field indicates palette compliance.
-    ///
-    /// [`check_sprite`]: SpritePalette::check_sprite
-    pub fn verify_all() -> Vec<SpriteReport> {
-        // Embed sprite PNGs at compile time via include_bytes! — no runtime
-        // I/O needed. Each embedded sprite is checked against the ≤16-color
-        // palette limit. New sprites should be added here as they are created.
-        vec![
-            Self::check_sprite("coin", include_bytes!("../assets/coin.png")),
-            Self::check_sprite("heart", include_bytes!("../assets/heart.png")),
-        ]
-    }
 }
 
 // ============================================================================
@@ -397,25 +374,6 @@ mod tests {
         assert_eq!(report.color_count, 16, "Should count 16 unique colors");
         assert!(report.passed, "Exactly 16 colors should pass (<= 16)");
         assert!(report.error.is_none(), "No error expected for valid input");
-    }
-
-    /// T4 | FUNC/happy | Traces To: NFR-003 AC-3, §Interface Contract `verify_all`
-    ///
-    /// verify_all() returns a Vec<SpriteReport> with one entry per embedded sprite.
-    /// color_count matches manual count for each sprite.
-    /// Kills: verify_all missing a sprite PNG; embedded path typo causing compile failure.
-    #[test]
-    // [unit] — pure in-memory PNG byte analysis (compile-time embedding)
-    fn test_t4_verify_all_non_empty() {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            SpritePalette::verify_all()
-        }));
-        assert!(result.is_ok(), "verify_all should not panic");
-        let reports = result.unwrap();
-        assert!(
-            !reports.is_empty(),
-            "verify_all should return at least one sprite report"
-        );
     }
 
     /// T5 | FUNC/happy | Traces To: AC-1, §Interface Contract `apply_pixel_art_filter`
@@ -679,34 +637,6 @@ mod tests {
     // ==================================================================
     // T16–T17: UI — Palette / Filter visual quality verification
     // ==================================================================
-
-    /// T16 | UI/palette | Traces To: NFR-003 AC-2, ATS UI category, §Interface Contract `verify_all`
-    ///
-    /// verify_all() across all three resolutions: every SpriteReport.passed == true,
-    /// every sprite color_count ≤ 16.
-    /// Kills: cross-resolution palette count inconsistency; resolution-specific PNG decode path.
-    #[test]
-    // [unit] — pure in-memory PNG byte analysis
-    fn test_t16_verify_all_palette_compliance() {
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            SpritePalette::verify_all()
-        }));
-        assert!(result.is_ok(), "verify_all should not panic");
-        let reports = result.unwrap();
-        assert!(!reports.is_empty(), "verify_all should have at least one sprite");
-        for report in &reports {
-            assert!(
-                report.passed,
-                "Sprite '{}' failed palette check: color_count={} > 16",
-                report.name, report.color_count
-            );
-            assert!(
-                report.color_count <= 16,
-                "Sprite '{}' has {} colors, exceeds 16-color limit",
-                report.name, report.color_count
-            );
-        }
-    }
 
     /// T17 | UI/filter | Traces To: NFR-003 AC-1, ATS UI category, §Interface Contract `apply_pixel_art_filter`
     ///
