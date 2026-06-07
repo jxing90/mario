@@ -11,7 +11,7 @@ use mario_platformer::entities::player::{Player, PlayerConfig, PlayerState};
 use mario_platformer::level::Vec2;
 use mario_platformer::states::LifeState;
 use mario_platformer::states::PlayingState;
-use mario_platformer::states::playing::Brick;
+use mario_platformer::entities::brick::Brick;
 
 // ============================================================================
 // Coin collection through update() pipeline
@@ -165,7 +165,7 @@ fn update_pipeline_small_mario_hits_brick_does_not_break() {
     let mut state = PlayingState::new(player, life_state);
 
     // Add a test brick just above the player
-    state.bricks.push(Brick { pos: Vec2 { x: 300.0, y: 445.0 }, broken: false });
+    state.bricks.push(Brick { pos: Vec2 { x: 300.0, y: 445.0 }, broken: false, particles: Vec::new() });
     let brick_idx = state.bricks.len() - 1;
 
     state.update(1.0 / 60.0);
@@ -189,7 +189,7 @@ fn update_pipeline_super_mario_breaks_brick() {
     let life_state = LifeState::new();
     let mut state = PlayingState::new(player, life_state);
 
-    state.bricks.push(Brick { pos: Vec2 { x: 300.0, y: 445.0 }, broken: false });
+    state.bricks.push(Brick { pos: Vec2 { x: 300.0, y: 445.0 }, broken: false, particles: Vec::new() });
     let brick_idx = state.bricks.len() - 1;
 
     state.update(1.0 / 60.0);
@@ -210,7 +210,7 @@ fn update_pipeline_fire_mario_breaks_brick() {
     let life_state = LifeState::new();
     let mut state = PlayingState::new(player, life_state);
 
-    state.bricks.push(Brick { pos: Vec2 { x: 300.0, y: 445.0 }, broken: false });
+    state.bricks.push(Brick { pos: Vec2 { x: 300.0, y: 445.0 }, broken: false, particles: Vec::new() });
     let brick_idx = state.bricks.len() - 1;
 
     state.update(1.0 / 60.0);
@@ -230,7 +230,7 @@ fn update_pipeline_already_broken_brick_ignored() {
     let life_state = LifeState::new();
     let mut state = PlayingState::new(player, life_state);
 
-    state.bricks.push(Brick { pos: Vec2 { x: 300.0, y: 445.0 }, broken: true });
+    state.bricks.push(Brick { pos: Vec2 { x: 300.0, y: 445.0 }, broken: true, particles: Vec::new() });
     let brick_idx = state.bricks.len() - 1;
 
     state.update(1.0 / 60.0);

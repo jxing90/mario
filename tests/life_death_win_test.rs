@@ -56,7 +56,7 @@
 //     CheckProgress(yes): T13
 //     CheckProgress(no): T12
 
-use mario_platformer::entities::player::{Player, PlayerConfig};
+use mario_platformer::entities::player::{Player, PlayerConfig, PlayerState};
 use mario_platformer::level::{AABB, Level, Tile, Vec2};
 use mario_platformer::input::InputState;
 use mario_platformer::systems::physics::{CollisionEvent, Physics};
@@ -2504,7 +2504,7 @@ fn t52_cov_life_state_new_default_reset() {
 fn t53_cov_dead_state_new() {
     let death_pos = Vec2 { x: 300.0, y: 600.0 };
     let checkpoint = Some(Vec2 { x: 500.0, y: 400.0 });
-    let ds = DeadState::new(2, 5, checkpoint, death_pos);
+    let ds = DeadState::new(2, 5, 1, checkpoint, death_pos, 1280.0, 720.0);
 
     assert_eq!(ds.lives, 2);
     assert_eq!(ds.coins, 5);
@@ -2524,7 +2524,7 @@ fn t53_cov_dead_state_new() {
 fn t54_cov_dead_state_update_respawn() {
     let death_pos = Vec2 { x: 300.0, y: 600.0 };
     let checkpoint = Some(Vec2 { x: 500.0, y: 400.0 });
-    let mut ds = DeadState::new(2, 5, checkpoint, death_pos);
+    let mut ds = DeadState::new(2, 5, 1, checkpoint, death_pos, 1280.0, 720.0);
 
     // Before timer expires: update returns None (still in death animation)
     let result = ds.update(DT);
@@ -2558,7 +2558,7 @@ fn t54_cov_dead_state_update_respawn() {
 #[test]
 fn t55_cov_dead_state_update_game_over() {
     let death_pos = Vec2 { x: 300.0, y: 600.0 };
-    let mut ds = DeadState::new(0, 10, None, death_pos); // lives=0, no checkpoint
+    let mut ds = DeadState::new(0, 10, 1, None, death_pos, 1280.0, 720.0); // lives=0, no checkpoint
 
     // Fast-forward to expiration
     ds.death_timer = 0.01;
@@ -2581,7 +2581,7 @@ fn t55_cov_dead_state_update_game_over() {
 #[test]
 fn t56_cov_dead_state_bounce_phase() {
     let pos = Vec2 { x: 100.0, y: 100.0 };
-    let mut ds = DeadState::new(2, 0, None, pos);
+    let mut ds = DeadState::new(2, 0, 1, None, pos, 1280.0, 720.0);
 
     // Initial: bounce_phase = 0.0, death_timer = 1.5
     assert!(approx_eq(ds.bounce_phase, 0.0));
@@ -2617,7 +2617,7 @@ fn t56_cov_dead_state_bounce_phase() {
 #[test]
 fn t57_cov_dead_state_respawn_no_checkpoint() {
     let pos = Vec2 { x: 300.0, y: 600.0 };
-    let mut ds = DeadState::new(1, 42, None, pos); // no checkpoint
+    let mut ds = DeadState::new(1, 42, 1, None, pos, 1280.0, 720.0); // no checkpoint
 
     ds.death_timer = 0.01;
     let result = ds.update(DT);
@@ -2805,7 +2805,7 @@ fn t65_cov_game_over_state_new_and_update() {
 
 #[test]
 fn t66_cov_victory_state_new_and_update() {
-    let mut vs = VictoryState::new(99, 0);
+    let mut vs = VictoryState::new(99, 0, PlayerState::Small, 1);
     assert_eq!(vs.coins, 99);
     assert!(approx_eq(vs.blink_phase, 0.0));
 
@@ -2827,7 +2827,7 @@ fn t66_cov_victory_state_new_and_update() {
 fn t67_cov_game_state_full_reset() {
     // Start with a Dead state to ensure full_reset properly switches to Playing
     let pos = Vec2 { x: 100.0, y: 100.0 };
-    let ds = DeadState::new(2, 5, None, pos);
+    let ds = DeadState::new(2, 5, 1, None, pos, 1280.0, 720.0);
     let mut gs = GameState::Dead(ds);
 
     gs.full_reset();
@@ -2852,7 +2852,7 @@ fn t67_cov_game_state_full_reset() {
 #[test]
 fn t68_cov_game_state_update_dead() {
     let pos = Vec2 { x: 300.0, y: 600.0 };
-    let ds = DeadState::new(1, 5, None, pos);
+    let ds = DeadState::new(1, 5, 1, None, pos, 1280.0, 720.0);
     let mut gs = GameState::Dead(ds);
 
     // Fast-forward death timer manually via inner mutation
@@ -2909,7 +2909,7 @@ fn t69_cov_game_state_update_game_over() {
 
 #[test]
 fn t70_cov_game_state_update_victory() {
-    let vs = VictoryState::new(99, 0);
+    let vs = VictoryState::new(99, 0, PlayerState::Small, 1);
     let mut gs = GameState::Victory(vs);
 
     gs.update(DT);
@@ -2972,13 +2972,13 @@ fn t73_cov_game_state_render_dispatch() {
     gs_playing.render(0.0);
 
     let pos = Vec2 { x: 100.0, y: 100.0 };
-    let mut gs_dead = GameState::Dead(DeadState::new(2, 0, None, pos));
+    let mut gs_dead = GameState::Dead(DeadState::new(2, 0, 1, None, pos, 1280.0, 720.0));
     gs_dead.render(0.0);
 
     let mut gs_go = GameState::GameOver(GameOverState::new(10, 0));
     gs_go.render(0.0);
 
-    let mut gs_victory = GameState::Victory(VictoryState::new(99, 0));
+    let mut gs_victory = GameState::Victory(VictoryState::new(99, 0, PlayerState::Small, 1));
     gs_victory.render(0.0);
 
     let mut gs_paused = GameState::Paused;

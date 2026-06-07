@@ -1565,6 +1565,8 @@ fn d2_intg_physics_block_activate_powerup_spawn_chain() {
             match (&kind, &power_up.kind) {
                 (PowerUpKind::SuperMushroom, PowerUpKind::SuperMushroom) => true,
                 (PowerUpKind::FireFlower, PowerUpKind::FireFlower) => true,
+                (PowerUpKind::Starman, PowerUpKind::Starman) => true,
+                (PowerUpKind::OneUpMushroom, PowerUpKind::OneUpMushroom) => true,
                 _ => false,
             },
             "Spawned PowerUp kind must match LootTable result ({:?}), got {:?}",
@@ -1685,6 +1687,7 @@ fn e1_perf_probability_loot_table_distribution_500_rolls() {
             PowerUpKind::Coin => coin_count += 1,
             PowerUpKind::SuperMushroom => mushroom_count += 1,
             PowerUpKind::FireFlower => flower_count += 1,
+            PowerUpKind::Starman | PowerUpKind::OneUpMushroom => {}
         }
     }
 

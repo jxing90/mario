@@ -109,7 +109,7 @@ fn e2e_enemy_stomp_chain_approach_stomp_destroy() {
 #[test]
 fn e2e_death_respawn_at_level_start_no_checkpoint() {
     let player_pos = Vec2 { x: 500.0, y: 500.0 };
-    let dead = DeadState::new(2, 10, None, player_pos);
+    let dead = DeadState::new(2, 10, 1, None, player_pos, 1280.0, 720.0);
 
     assert_eq!(dead.lives, 2, "Lives already decremented before DeadState");
     assert_eq!(dead.coins, 10, "Coins preserved from run");
@@ -147,8 +147,11 @@ fn e2e_checkpoint_activation_persists_to_dead_state() {
     let dead = DeadState::new(
         state.life_state.lives - 1,
         state.life_state.coins,
+        1,
         state.life_state.checkpoint,
         state.player.pos,
+        1280.0,
+        720.0,
     );
 
     assert_eq!(dead.checkpoint.unwrap().x, cp_pos.x);
@@ -166,7 +169,7 @@ fn e2e_checkpoint_activation_persists_to_dead_state() {
 fn e2e_final_death_triggers_game_over() {
     let player_pos = Vec2 { x: 300.0, y: 500.0 };
     // DeadState with lives=0 (final death)
-    let dead = DeadState::new(0, 25, None, player_pos);
+    let dead = DeadState::new(0, 25, 1, None, player_pos, 1280.0, 720.0);
 
     assert_eq!(dead.lives, 0, "Lives exhausted");
     assert_eq!(dead.coins, 25, "Coin count preserved in death");
