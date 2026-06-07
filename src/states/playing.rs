@@ -5,24 +5,26 @@
 // detection, invulnerability timers, and triggers transitions to Dead/Victory.
 
 use crate::audio::SoundManager;
+use crate::entities::brick::Brick;
+use crate::entities::checkpoint::Checkpoint;
 use crate::entities::coin::Coin;
 use crate::entities::dart::Dart;
 use crate::entities::dart_enemy::DartEnemy;
 use crate::entities::enemy::{Enemy, EnemyConfig};
 use crate::entities::fireball::Fireball;
+use crate::entities::flagpole::{Flagpole, FlagpolePhase};
+use crate::entities::key::Key;
 use crate::entities::osc_fireball::OscFireball;
 use crate::entities::player::Player;
-use crate::entities::flagpole::{Flagpole, FlagpolePhase};
-use crate::entities::brick::Brick;
-use crate::entities::checkpoint::Checkpoint;
+use crate::entities::portal::Portal;
 use crate::entities::power_up::{PowerUp, PowerUpKind};
 use crate::entities::question_block::QuestionBlock;
 use crate::level::{BrickSpawn, Level, LevelBounds, Vec2};
+use crate::states::{DeadState, GameOverState, GameState, LifeState, VictoryState};
 use crate::systems::camera::Camera;
 use crate::systems::camera::CameraConfig;
 use crate::systems::hud::HudRenderer;
 use crate::systems::physics::{CollisionEvent, Physics};
-use crate::states::{GameState, LifeState, VictoryState, GameOverState, DeadState};
 
 /// The main gameplay state — normal play, hazard detection, and flagpole/checkpoint logic.
 ///
@@ -83,6 +85,13 @@ pub struct PlayingState {
     rng_state: u64,
     /// Sound effects manager (None during tests — no audio backend).
     pub sfx: Option<SoundManager>,
+    pub portals: Vec<crate::entities::portal::Portal>,
+    /// Collected keys carried by the player (consumed on use).
+    pub keys: Vec<Key>,
+    /// On-screen hint message (e.g. "门已破损"), shown briefly then fades.
+    pub hint_text: String,
+    /// Seconds remaining for the current hint message.
+    pub hint_timer: f32,
 }
 
 impl PlayingState {
@@ -150,6 +159,19 @@ impl PlayingState {
             .map(|o| OscFireball::new(o.x, o.top_y, o.bottom_y))
             .collect();
 
+        // Spawn portals from level config
+        let portals: Vec<crate::entities::portal::Portal> = level.portal_spawns.iter()
+            .map(|p| crate::entities::portal::Portal::new_with(
+                p.id, p.dest_id, Vec2 { x: p.x, y: p.y },
+                p.locked, p.key_color, p.destroyed,
+            ))
+            .collect();
+
+        // Spawn keys from level config
+        let keys: Vec<Key> = level.key_spawns.iter()
+            .map(|k| Key::new(Vec2 { x: k.x, y: k.y }, k.color))
+            .collect();
+
         Self {
             player,
             level,
@@ -182,6 +204,10 @@ impl PlayingState {
             level_bounds: bounds,
             rng_state: Self::seed_rng(),
             sfx: None,
+            portals,
+            keys,
+            hint_text: String::new(),
+            hint_timer: 0.0,
         }
     }
 
@@ -249,6 +275,15 @@ impl PlayingState {
             self.player.star_timer -= dt;
             if self.player.star_timer < 0.0 {
                 self.player.star_timer = 0.0;
+            }
+        }
+
+        // 1c. Advance hint timer
+        if self.hint_timer > 0.0 {
+            self.hint_timer -= dt;
+            if self.hint_timer <= 0.0 {
+                self.hint_timer = 0.0;
+                self.hint_text.clear();
             }
         }
 
@@ -782,7 +817,88 @@ impl PlayingState {
             self.power_ups.remove(i);
         }
 
-        // 8. Flagpole check: if player overlaps flagpole collider → victory slide
+        // 7c. Key collection: player overlaps → add to inventory
+        for key in self.keys.iter_mut() {
+            if !key.collected && player_col.intersects(&key.collider()) {
+                key.collected = true;
+            }
+        }
+
+        // 8. Portal update + warp: player overlaps + presses UP → activate + warp
+        let up_pressed = self.screen_w > 0.0
+            && macroquad::input::is_key_pressed(macroquad::input::KeyCode::Up);
+        let player_col = self.player.collider();
+
+        // Pre-compute destination positions (immutable borrow)
+        let dest_positions: Vec<Option<Vec2>> = self.portals.iter().map(|p| {
+            if p.dest_id > 0 {
+                self.portals.iter().find(|d| d.id == p.dest_id).map(|d| d.warp_destination())
+            } else {
+                None
+            }
+        }).collect();
+
+        let mut warp_to: Option<(usize, Vec2)> = None;
+        for (i, portal) in self.portals.iter_mut().enumerate() {
+            portal.update(dt);
+            if portal.warp_cooldown > 0.0 {
+                continue;
+            }
+            if portal.destroyed {
+                if up_pressed && player_col.intersects(&portal.collider()) {
+                    self.hint_text = String::from("门已破损，无法打开");
+                    self.hint_timer = 2.0;
+                }
+                continue;
+            }
+            if !player_col.intersects(&portal.collider()) {
+                continue;
+            }
+            // Check lock: if locked, consume matching key; without key → hint
+            let can_open = if portal.locked {
+                let needed = portal.key_color;
+                let key_idx = self.keys.iter().position(|k| k.collected && Some(k.color) == needed);
+                if let Some(idx) = key_idx {
+                    self.keys.remove(idx);
+                    portal.locked = false; // permanently unlock
+                    true
+                } else {
+                    if up_pressed {
+                        self.hint_text = if let Some(kc) = needed {
+                            format!("门已上锁，需要{}钥匙才能打开", kc.chinese_name())
+                        } else {
+                            String::from("门已上锁，需要钥匙才能打开")
+                        };
+                        self.hint_timer = 2.0;
+                    }
+                    false
+                }
+            } else {
+                true // not locked
+            };
+            if up_pressed && !portal.open && can_open {
+                portal.open = true;
+                self.hint_text = String::from("门已打开");
+                self.hint_timer = 1.5;
+            }
+            if portal.open && portal.open_progress > 0.6 && warp_to.is_none() {
+                if let Some(dest_pos) = &dest_positions[i] {
+                    warp_to = Some((i, *dest_pos));
+                }
+            }
+        }
+
+        if let Some((si, dest_pos)) = warp_to {
+            self.player.pos = dest_pos;
+            self.player.vel = Vec2 { x: 0.0, y: 0.0 };
+            // Let auto-close timer handle source portal
+            let dest_id = self.portals[si].dest_id;
+            if let Some(dest) = self.portals.iter_mut().find(|p| p.id == dest_id) {
+                dest.warp_cooldown = 1.0;
+            }
+        }
+
+        // 9. Flagpole check: if player overlaps flagpole collider → victory slide
         if self.flagpole.phase == FlagpolePhase::Idle
             && self.player.collider().intersects(&self.flagpole.collider())
         {
@@ -1026,6 +1142,16 @@ impl PlayingState {
             ofb.draw(sx, sy, &ws);
         }
 
+        // ── 8g. Portals ──
+        for portal in &self.portals {
+            portal.draw(sx, sy, &ws, self.frame_count);
+        }
+
+        // ── 8h. Keys ──
+        for key in &self.keys {
+            key.draw(sx, sy, &ws);
+        }
+
         // ── 9. Player (Mario) ──
         use macroquad::shapes::draw_circle;
         use macroquad::text::draw_text;
@@ -1136,6 +1262,32 @@ impl PlayingState {
             font_size,
             time_color,
         );
+        // Column 5: Collected keys (colored squares + count)
+        let key_x = 580.0 * sx;
+        let key_colors = [
+            crate::level::KeyColor::Red,
+            crate::level::KeyColor::Orange,
+            crate::level::KeyColor::Yellow,
+            crate::level::KeyColor::Green,
+            crate::level::KeyColor::Blue,
+            crate::level::KeyColor::Indigo,
+            crate::level::KeyColor::Violet,
+        ];
+        for (i, &kc) in key_colors.iter().enumerate() {
+            let count = self.keys.iter().filter(|k| k.collected && k.color == kc).count();
+            if count > 0 {
+                let kx = key_x + i as f32 * 32.0 * sx;
+                let rgba = crate::entities::key::key_color_rgba(kc);
+                draw_rectangle(kx, y_pos - 2.0 * sy, 10.0 * sx, 10.0 * sy, rgba);
+                draw_text(
+                    &format!("x{}", count),
+                    kx + 13.0 * sx,
+                    y_pos,
+                    font_size,
+                    macroquad::color::WHITE,
+                );
+            }
+        }
         // Star power countdown (inline when active)
         if self.player.star_timer > 0.0 {
             let star_color = macroquad::color::Color::new(1.0, 0.85, 0.0, 1.0);
@@ -1145,6 +1297,19 @@ impl PlayingState {
                 y_pos,
                 font_size,
                 star_color,
+            );
+        }
+        // Hint text (centered, screen-space, fades with timer)
+        if !self.hint_text.is_empty() {
+            let hint_font = 22.0 * sx.min(sy);
+            let alpha = (self.hint_timer / 2.0).min(1.0);
+            let hc = macroquad::color::Color::new(1.0, 0.85, 0.3, alpha);
+            crate::draw_text_cjk(
+                &self.hint_text,
+                sw / 2.0 - hint_font * self.hint_text.len() as f32 * 0.3,
+                sh * 0.55,
+                hint_font,
+                hc,
             );
         }
     }

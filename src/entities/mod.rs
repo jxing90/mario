@@ -12,3 +12,5 @@ pub mod dart;
 pub mod dart_enemy;
 pub mod osc_fireball;
 pub mod loot_table;
+pub mod portal;
+pub mod key;

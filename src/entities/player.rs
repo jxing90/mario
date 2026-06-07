@@ -442,7 +442,42 @@ impl Player {
                     continue;
                 }
 
-                if min_overlap == overlap_left && self.vel.x > 0.0 {
+                // If the player is walking on top of this platform (feet on it,
+                // not jumping, vertical penetration is only from gravity), treat
+                // as floor regardless of which edge has the minimum overlap.
+                //
+                // Without this, crossing the seam between two adjacent same-height
+                // blocks triggers a wall collision: at the exact boundary,
+                // overlap_left/overlap_right can be 0 while overlap_top is only
+                // ~0.35 px from one frame of gravity. The wall check fires first
+                // (min_overlap == overlap_left), killing vel.x and trapping the
+                // player. Only jumping can escape because it changes vertical
+                // velocity, rerouting through the ceiling code path.
+                //
+                // Two-tier protection:
+                //   Tier 1 — deep penetration (landing / falling onto platform):
+                //            overlap_top >= 45% of player height and not too far
+                //            from the minimum overlap.
+                //   Tier 2 — shallow penetration (walking, seam crossing):
+                //            feet at platform top and vertical overlap ≤ 4 px.
+                //            The 4 px cap is ~11 frames of gravity; a genuine
+                //            wall hit from the side would have a much larger
+                //            vertical overlap relative to the player's height.
+                let treat_as_floor = feet_at_platform
+                    && self.vel.y >= 0.0
+                    && overlap_top >= player_h * 0.45
+                    && overlap_top < min_overlap + player_h * 0.6;
+
+                let walking_on_top = feet_at_platform
+                    && self.vel.y >= 0.0
+                    && overlap_top <= 4.0;
+
+                if treat_as_floor || walking_on_top {
+                    self.vel.y = 0.0;
+                    self.on_ground = true;
+                    self.pos.y = platform_aabb.y;
+                    continue;
+                } else if min_overlap == overlap_left && self.vel.x > 0.0 {
                     self.vel.x = 0.0;
                     self.pos.x = platform_aabb.x - player_w / 2.0;
                 } else if min_overlap == overlap_right && self.vel.x < 0.0 {

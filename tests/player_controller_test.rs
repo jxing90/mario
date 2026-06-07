@@ -1894,3 +1894,251 @@ fn t38_add_coin_100_awards_1up() {
     assert_eq!(player.coins, 0, "T38h: coins reset");
     assert_eq!(player.lives, 6, "T38i: lives increase");
 }
+
+// ============================================================================
+// T39 — Walking across seam of adjacent same-height bricks must not get stuck.
+// When two 32x32 bricks sit next to each other at the same Y, the player
+// walking horizontally across the seam must not be stopped by wall collision
+// on the edge between them (the seam should be treated as continuous floor).
+// ============================================================================
+
+#[test]
+fn t39_walk_across_adjacent_brick_seam_not_stuck() {
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+
+    // Two adjacent 32x32 bricks at y=544: left (400..432), right (432..464)
+    // Two adjacent bricks at y=544: left (400..432), right (432..464)
+    let left = AABB { x: 400.0, y: 544.0, w: 32.0, h: 32.0 };
+    let right = AABB { x: 432.0, y: 544.0, w: 32.0, h: 32.0 };
+    let terrain = vec![Tile::Platform(left), Tile::Platform(right)];
+
+    // Place player at the seam. Player AABB straddles both bricks.
+    player.pos = Vec2 { x: 432.0, y: 544.0 };
+    player.vel = Vec2 { x: 80.0, y: 0.0 }; // already moving right
+    player.on_ground = true;
+
+    // One collision resolution — must NOT zero out vel.x at the seam.
+    player.resolve_collisions(DT, &terrain);
+
+    assert!(
+        player.vel.x > 0.0,
+        "T39a: vel.x zeroed by seam collision. vel.x={}",
+        player.vel.x
+    );
+    assert!(
+        player.on_ground,
+        "T39b: on_ground lost at seam. on_ground={}",
+        player.on_ground
+    );
+}
+
+// ============================================================================
+// T40 — Walking across brick seam with real gravity (advance_position first).
+// T39 passes even without the fix because it calls resolve_collisions directly
+// without advance_position, so overlap_top stays exactly 0 and floor collision
+// (line 473) catches it. In real gameplay, advance_position runs first and
+// gravity pushes the player down ~0.35 px per frame. If the horizontal edge
+// overlap at the seam is also tiny, the wall check can fire before the floor
+// check when overlap_left/overlap_right < overlap_top.
+//
+// This test calls advance_position → resolve_collisions (matching playing.rs),
+// giving the player rightward velocity and letting gravity accumulate.
+// ============================================================================
+
+#[test]
+fn t40_seam_cross_with_advance_gravity() {
+    use mario_platformer::entities::player::{Player, PlayerConfig};
+    use mario_platformer::input::InputState;
+    use mario_platformer::level::{AABB, Tile, Vec2};
+
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+
+    // Two adjacent 32×32 bricks at y=544: left (400..432), right (432..464)
+    let left = AABB { x: 400.0, y: 544.0, w: 32.0, h: 32.0 };
+    let right = AABB { x: 432.0, y: 544.0, w: 32.0, h: 32.0 };
+    let terrain = vec![Tile::Platform(left), Tile::Platform(right)];
+
+    // Place player 2px left of the seam, already standing on the bricks.
+    // This is the worst-case position: one frame of advance_position moves
+    // the player just barely across the seam.
+    player.pos = Vec2 { x: 430.0, y: 544.0 };
+    player.vel = Vec2 { x: 200.0, y: 0.0 }; // max_speed walking right
+    player.on_ground = true;
+
+    let mut input = InputState::default();
+    input.right = true;
+    input.sprint = false;
+
+    // One full update frame — advance_position integrates gravity + horizontal
+    // movement, then resolve_collisions should NOT kill vel.x at the seam.
+    player.update(DT, &input, &terrain);
+
+    assert!(
+        player.vel.x > 0.0,
+        "T40a: vel.x zeroed at brick seam after advance+gravity. vel.x={}",
+        player.vel.x
+    );
+    assert!(
+        player.on_ground,
+        "T40b: on_ground lost after crossing seam. on_ground={}",
+        player.on_ground
+    );
+    // Player must have crossed into or past the seam area.
+    assert!(
+        player.pos.x > 430.0,
+        "T40c: player did not advance past seam. pos.x={}",
+        player.pos.x
+    );
+}
+
+// ============================================================================
+// T41 — LEFTward seam crossing (mirror of T40). Same root cause: wall
+// collision fires on overlap_right == 0 at the seam while walking left.
+// ============================================================================
+
+#[test]
+fn t41_seam_cross_leftward_with_advance_gravity() {
+    use mario_platformer::entities::player::{Player, PlayerConfig};
+    use mario_platformer::input::InputState;
+    use mario_platformer::level::{AABB, Tile, Vec2};
+
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+
+    // Two adjacent bricks: left (400..432), right (432..464)
+    let left = AABB { x: 400.0, y: 544.0, w: 32.0, h: 32.0 };
+    let right = AABB { x: 432.0, y: 544.0, w: 32.0, h: 32.0 };
+    let terrain = vec![Tile::Platform(left), Tile::Platform(right)];
+
+    // Place player 2px RIGHT of the seam, walking left at max speed.
+    player.pos = Vec2 { x: 434.0, y: 544.0 };
+    player.vel = Vec2 { x: -200.0, y: 0.0 };
+    player.on_ground = true;
+
+    let mut input = InputState::default();
+    input.left = true;
+
+    player.update(DT, &input, &terrain);
+
+    assert!(
+        player.vel.x < 0.0,
+        "T41a: vel.x zeroed walking left across seam. vel.x={}",
+        player.vel.x
+    );
+    assert!(
+        player.on_ground,
+        "T41b: on_ground lost after leftward seam. on_ground={}",
+        player.on_ground
+    );
+    assert!(
+        player.pos.x < 434.0,
+        "T41c: player did not advance past seam leftward. pos.x={}",
+        player.pos.x
+    );
+}
+
+// ============================================================================
+// T42 — Multi-frame walk across row of 3 adjacent bricks. Simulates the
+// playing.rs update loop: advance_position (gravity + horizontal) each
+// frame, then resolve_collisions. Must never get stuck at any seam.
+// ============================================================================
+
+#[test]
+fn t42_multi_frame_across_three_bricks() {
+    use mario_platformer::entities::player::{Player, PlayerConfig};
+    use mario_platformer::input::InputState;
+    use mario_platformer::level::{AABB, Tile, Vec2};
+
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+
+    // Three adjacent 32×32 bricks at y=544:
+    //   400..432, 432..464, 464..496
+    let bricks = vec![
+        AABB { x: 400.0, y: 544.0, w: 32.0, h: 32.0 },
+        AABB { x: 432.0, y: 544.0, w: 32.0, h: 32.0 },
+        AABB { x: 464.0, y: 544.0, w: 32.0, h: 32.0 },
+    ];
+    let terrain: Vec<Tile> = bricks.iter().map(|b| Tile::Platform(*b)).collect();
+
+    // Start on the first brick, 4px left of seam #1 (at x=432).
+    player.pos = Vec2 { x: 428.0, y: 544.0 };
+    player.vel = Vec2 { x: 0.0, y: 0.0 };
+    player.on_ground = true;
+
+    let mut input = InputState::default();
+    input.right = true;
+
+    // Walk 30 frames — should cross both seams and reach the third brick.
+    for _ in 0..30 {
+        player.update(DT, &input, &terrain);
+    }
+
+    // After 30 frames at max speed (~200 px/s), player should have moved
+    // well past seam #2 at x=464.
+    assert!(
+        player.pos.x > 465.0,
+        "T42a: player stuck before seam #2. pos.x={}",
+        player.pos.x
+    );
+    assert!(
+        player.on_ground,
+        "T42b: on_ground lost during multi-seam walk. on_ground={}",
+        player.on_ground
+    );
+    // vel.x must still be positive (not zeroed by any seam).
+    assert!(
+        player.vel.x > 0.0,
+        "T42c: vel.x zeroed during multi-seam walk. vel.x={}",
+        player.vel.x
+    );
+}
+
+// ============================================================================
+// T43 — Sprint across seam (higher horizontal speed = deeper penetration
+// into next block after advance_position). Must still resolve as floor.
+// ============================================================================
+
+#[test]
+fn t43_sprint_across_brick_seam() {
+    use mario_platformer::entities::player::{Player, PlayerConfig};
+    use mario_platformer::input::InputState;
+    use mario_platformer::level::{AABB, Tile, Vec2};
+
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+
+    let left = AABB { x: 400.0, y: 544.0, w: 32.0, h: 32.0 };
+    let right = AABB { x: 432.0, y: 544.0, w: 32.0, h: 32.0 };
+    let terrain = vec![Tile::Platform(left), Tile::Platform(right)];
+
+    // Already at max sprint speed (300 px/s) just left of seam.
+    player.pos = Vec2 { x: 428.0, y: 544.0 };
+    player.vel = Vec2 { x: 300.0, y: 0.0 };
+    player.on_ground = true;
+
+    let mut input = InputState::default();
+    input.right = true;
+    input.sprint = true;
+
+    player.update(DT, &input, &terrain);
+
+    assert!(
+        player.vel.x > 0.0,
+        "T43a: sprint vel.x zeroed at seam. vel.x={}",
+        player.vel.x
+    );
+    assert!(
+        player.on_ground,
+        "T43b: on_ground lost during sprint seam. on_ground={}",
+        player.on_ground
+    );
+    // Sprinting should cross the seam cleanly.
+    assert!(
+        player.pos.x > 428.0,
+        "T43c: player did not advance during sprint. pos.x={}",
+        player.pos.x
+    );
+}

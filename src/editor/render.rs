@@ -200,6 +200,30 @@ impl EditorState {
             draw_ellipse(cx + cw * 0.6, cy + ch * 0.25, cw * 0.55, ch * 0.4, 0.0, cc);
         }
 
+        // ── Portals ──
+        for p in &self.data.portals {
+            let (px, py) = ws(p.x - 16.0, p.y - 48.0);
+            let pw = 32.0 * self.zoom;
+            let ph = 48.0 * self.zoom;
+            if p.destroyed {
+                // Broken door: dark, cracked, red X overlay
+                draw_rectangle(px, py, pw, ph, Color::new(0.06, 0.05, 0.10, 0.9));
+                draw_rectangle_lines(px, py, pw, ph, 1.5, Color::new(0.25, 0.10, 0.10, 0.8));
+                let xc = Color::new(0.55, 0.12, 0.12, 0.7);
+                draw_line(px + 4.0, py + 4.0, px + pw - 4.0, py + ph - 4.0, 2.0, xc);
+                draw_line(px + pw - 4.0, py + 4.0, px + 4.0, py + ph - 4.0, 2.0, xc);
+                draw_text(&format!("P{}(X)", p.id), px + 3.0, py + ph / 2.0 + 6.0,
+                    10.0 * self.zoom, Color::new(0.8, 0.3, 0.3, 1.0));
+            } else {
+                // Door body
+                draw_rectangle(px, py, pw, ph, Color::new(0.18, 0.15, 0.28, 0.9));
+                draw_rectangle_lines(px, py, pw, ph, 2.5, Color::new(0.45, 0.30, 0.75, 1.0));
+                // ID label
+                draw_text(&format!("P{}->P{}", p.id, p.dest_id), px + 3.0, py + ph / 2.0 + 6.0,
+                    10.0 * self.zoom, Color::new(0.7, 0.5, 1.0, 1.0));
+            }
+        }
+
         // ── Pending placement preview ──
         if let Some((sx, sy)) = self.plat_start {
             let (mx2, my2) = mouse_position();
@@ -341,7 +365,7 @@ impl EditorState {
         self.draw_properties_panel();
     }
 
-    fn draw_properties_panel(&self) {
+    fn draw_properties_panel(&mut self) {
         let target = match &self.selected_entity { Some(t) => t, None => return };
         let props = self.entity_properties();
         if props.is_empty() { return; }
@@ -393,10 +417,39 @@ impl EditorState {
 
             // Value (or edit buffer)
             let val_x = panel_x + panel_w - 6.0;
-            let val_color = if editing_this { Color::new(1.0, 1.0, 0.3, 1.0) } else { Color::new(1.0, 1.0, 1.0, 1.0) };
-            let val_text = if editing_this { format!("{}|", self.edit_buf) } else { format!("{:.0}", value) };
+            let dropdown_open = self.dropdown_field.as_deref() == Some(*field_name);
+            let val_color = if editing_this || dropdown_open { Color::new(1.0, 1.0, 0.3, 1.0) } else { Color::new(1.0, 1.0, 1.0, 1.0) };
+            let val_text = if editing_this {
+                format!("{}|", self.edit_buf)
+            } else if *field_name == "locked" || *field_name == "destroyed" {
+                if *value >= 0.5 { "true".to_string() } else { "false".to_string() }
+            } else if *field_name == "key_clr" {
+                match *value as i32 {
+                    0 => "红色 ▼".to_string(),
+                    1 => "橙色 ▼".to_string(),
+                    2 => "黄色 ▼".to_string(),
+                    3 => "绿色 ▼".to_string(),
+                    4 => "蓝色 ▼".to_string(),
+                    5 => "靛色 ▼".to_string(),
+                    6 => "紫色 ▼".to_string(),
+                    _ => format!("{:.0}  ▼", value),
+                }
+            } else if *field_name == "color" {
+                match *value as i32 {
+                    0 => "红色 ▼".to_string(),
+                    1 => "橙色 ▼".to_string(),
+                    2 => "黄色 ▼".to_string(),
+                    3 => "绿色 ▼".to_string(),
+                    4 => "蓝色 ▼".to_string(),
+                    5 => "靛色 ▼".to_string(),
+                    6 => "紫色 ▼".to_string(),
+                    _ => format!("{:.0}  ▼", value),
+                }
+            } else {
+                format!("{:.0}", value)
+            };
             let val_w = measure_text(&val_text, None, 12, 1.0).width;
-            draw_text(&val_text, val_x - val_w, row_y + prop_font, prop_font, val_color);
+            draw_text_cjk(&val_text, val_x - val_w, row_y + prop_font, prop_font, val_color);
         }
 
         // Apply / Reset buttons (only when editing)
@@ -421,6 +474,38 @@ impl EditorState {
             let rw = measure_text("Reset", None, 12, 1.0).width;
             draw_text("Reset", reset_x + (half_w - rw) / 2.0, btn_y + btn_h - 4.0, btn_font, Color::new(1.0, 0.8, 0.8, 1.0));
         }
+
+        // Dropdown overlay (if open for key_clr or color)
+        if let Some(ref field) = self.dropdown_field {
+            let options: Vec<&str> = if field == "key_clr" {
+                vec!["红色", "橙色", "黄色", "绿色", "蓝色", "靛色", "紫色"]
+            } else {
+                vec!["红色", "橙色", "黄色", "绿色", "蓝色", "靛色", "紫色"]
+            };
+            let dd_w = 100.0;
+            let dd_row = 20.0;
+            let dd_h = options.len() as f32 * dd_row + 4.0;
+            let dd_x = sw - dd_w - 12.0;
+            let dd_y = sh - panel_h - dd_h - 16.0;
+            self.dropdown_rects.clear();
+            // Background
+            draw_rectangle(dd_x - 2.0, dd_y - 2.0, dd_w + 4.0, dd_h + 4.0,
+                Color::new(0.08, 0.08, 0.18, 0.95));
+            draw_rectangle_lines(dd_x - 2.0, dd_y - 2.0, dd_w + 4.0, dd_h + 4.0,
+                1.0, Color::new(0.4, 0.4, 0.6, 0.9));
+            for (j, opt) in options.iter().enumerate() {
+                let oy = dd_y + 2.0 + j as f32 * dd_row;
+                let (cmx2, cmy2) = mouse_position();
+                let hover = cmx2 >= dd_x && cmx2 <= dd_x + dd_w && cmy2 >= oy && cmy2 <= oy + dd_row;
+                if hover {
+                    draw_rectangle(dd_x, oy, dd_w, dd_row, Color::new(0.3, 0.5, 0.9, 0.6));
+                }
+                draw_text_cjk(opt, dd_x + 6.0, oy + dd_row - 4.0, 14.0,
+                    if hover { Color::new(1.0, 1.0, 0.3, 1.0) } else { Color::new(0.9, 0.9, 0.9, 1.0) });
+                // Store rect for hit-testing
+                self.dropdown_rects.push((dd_x, oy, dd_w, dd_row));
+            }
+        }
     }
 
     fn entity_type_name(&self, target: &crate::editor::tool::DragTarget) -> String {
@@ -437,6 +522,8 @@ impl EditorState {
             crate::editor::tool::DragTarget::PlayerSpawn => "Player Spawn".into(),
             crate::editor::tool::DragTarget::Flagpole => "Flagpole".into(),
             crate::editor::tool::DragTarget::Cloud(_) => "Cloud".into(),
+            crate::editor::tool::DragTarget::Portal(_) => "Portal".into(),
+            crate::editor::tool::DragTarget::Key(_) => "Key".into(),
         }
     }
 }
@@ -477,20 +564,15 @@ fn property_tooltip_text(field: &str) -> &'static str {
         "way" => "巡逻点A的Y坐标",
         "wbx" => "巡逻点B的X坐标",
         "wby" => "巡逻点B的Y坐标",
+        "id" => "传送门ID (唯一标识)",
+        "dest_id" => "目标传送门ID (传送到哪里)",
+        "locked" => "是否上锁 (true/false, 点击切换)",
+        "key_clr" => "钥匙颜色 (0~6=红橙黄绿蓝靛紫)",
+        "destroyed" => "是否已破坏 (true/false, 点击切换)",
+        "color" => "颜色索引 (点击循环切换)",
         _ => "",
     }
 }
 
-// ── CJK font for Chinese tooltips ──
-
-use std::sync::OnceLock;
-static CJK_FONT: OnceLock<Option<macroquad::text::Font>> = OnceLock::new();
-
-/// Call once at startup to load a Chinese-capable font.
-pub fn init_cjk_font(font: Option<macroquad::text::Font>) {
-    CJK_FONT.set(font).ok();
-}
-
-fn cjk_font() -> Option<&'static macroquad::text::Font> {
-    CJK_FONT.get().and_then(|f| f.as_ref())
-}
+// CJK font — re-exported from crate root for editor usage
+pub use crate::{cjk_font, draw_text_cjk, init_cjk_font};

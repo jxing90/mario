@@ -20,6 +20,8 @@ pub(crate) enum Tool {
     Flagpole,
     PlayerSpawn,
     Cloud,
+    Portal,
+    Key,
     Eraser,
 }
 
@@ -39,6 +41,8 @@ impl Tool {
         Tool::Flagpole,
         Tool::PlayerSpawn,
         Tool::Cloud,
+        Tool::Portal,
+        Tool::Key,
         Tool::Eraser,
     ];
 
@@ -58,6 +62,8 @@ impl Tool {
             Tool::Flagpole => "Flagpole",
             Tool::PlayerSpawn => "Player",
             Tool::Cloud => "Cloud",
+            Tool::Portal => "Portal",
+            Tool::Key => "Key",
             Tool::Eraser => "Eraser",
         }
     }
@@ -78,6 +84,8 @@ impl Tool {
             Tool::Flagpole => "0",
             Tool::PlayerSpawn => "P",
             Tool::Cloud => "C",
+            Tool::Portal => "T",
+            Tool::Key => "K",
             Tool::Eraser => "Del",
         }
     }
@@ -97,6 +105,8 @@ pub(crate) enum DragTarget {
     Checkpoint(usize),
     PlayerSpawn,
     Cloud(usize),
+    Portal(usize),
+    Key(usize),
     Flagpole,
 }
 

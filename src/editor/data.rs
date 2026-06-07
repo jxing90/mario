@@ -37,6 +37,14 @@ pub(crate) struct OscFireballDef {
     pub(crate) bottom_y: f32,
 }
 
+/// A key placed in the level editor.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct KeyDef {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) color: crate::level::KeyColor,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct LevelData {
     #[serde(default)]
@@ -69,6 +77,10 @@ pub(crate) struct LevelData {
     pub(crate) theme: crate::level::ThemeColors,
     #[serde(default)]
     pub(crate) clouds: Vec<crate::level::CloudSpawn>,
+    #[serde(default)]
+    pub(crate) portals: Vec<crate::level::PortalSpawn>,
+    #[serde(default)]
+    pub(crate) keys: Vec<KeyDef>,
 }
 
 fn default_parallax() -> Vec<f32> {
@@ -100,6 +112,8 @@ impl Default for LevelData {
             parallax: default_parallax(),
             theme: crate::level::ThemeColors::default(),
             clouds: vec![],
+            portals: vec![],
+            keys: vec![],
         }
     }
 }

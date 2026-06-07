@@ -19,6 +19,10 @@ fn window_conf() -> macroquad::window::Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    // Load CJK font for Chinese hint text in-game
+    let cjk = macroquad::text::load_ttf_font("C:/Windows/Fonts/msyh.ttc").await.ok();
+    mario_platformer::init_cjk_font(cjk);
+
     let mut select = LevelSelectState::new();
     select.screen_w = macroquad::window::screen_width();
     select.screen_h = macroquad::window::screen_height();

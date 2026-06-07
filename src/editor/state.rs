@@ -45,6 +45,10 @@ pub struct EditorState {
     pub(crate) editing_field: Option<String>,
     /// Text buffer for the field being edited.
     pub(crate) edit_buf: String,
+    /// Dropdown for enum fields (e.g. key_clr). None = closed.
+    pub(crate) dropdown_field: Option<String>,
+    /// Dropdown option rects for hit-testing: (x, y, w, h).
+    pub(crate) dropdown_rects: Vec<(f32, f32, f32, f32)>,
 }
 
 impl EditorState {
@@ -86,6 +90,8 @@ impl Default for EditorState {
             selected_entity: None,
             editing_field: None,
             edit_buf: String::new(),
+            dropdown_field: None,
+            dropdown_rects: Vec::new(),
         }
     }
 }
@@ -177,6 +183,11 @@ impl EditorState {
                 return Some(DragTarget::Cloud(i));
             }
         }
+        for (i, p) in self.data.portals.iter().enumerate() {
+            if (wx - p.x).abs() <= 20.0 && wy >= p.y - 52.0 - tol && wy <= p.y + tol {
+                return Some(DragTarget::Portal(i));
+            }
+        }
         None
     }
 
@@ -204,6 +215,8 @@ impl EditorState {
             DragTarget::Checkpoint(i) => { if let Some(cp) = self.data.checkpoints.get_mut(i) { cp.x = x; cp.y = y; } }
             DragTarget::PlayerSpawn => { self.data.player_spawn = Pos { x, y }; }
             DragTarget::Cloud(i) => { if let Some(c) = self.data.clouds.get_mut(i) { c.x = x; c.y = y; } }
+            DragTarget::Portal(i) => { if let Some(p) = self.data.portals.get_mut(i) { p.x = x; p.y = y; } }
+            DragTarget::Key(i) => { if let Some(k) = self.data.keys.get_mut(i) { k.x = x; k.y = y; } }
             DragTarget::Flagpole => { self.data.flagpole = Pos { x, y }; }
         }
     }
@@ -222,7 +235,9 @@ impl EditorState {
             DragTarget::Checkpoint(i) => self.data.checkpoints.get(i).map(|c| (c.x, c.y)).unwrap_or((0.0, 0.0)),
             DragTarget::PlayerSpawn => (self.data.player_spawn.x, self.data.player_spawn.y),
             DragTarget::Cloud(i) => self.data.clouds.get(i).map(|c| (c.x, c.y)).unwrap_or((0.0, 0.0)),
+            DragTarget::Portal(i) => self.data.portals.get(i).map(|p| (p.x, p.y)).unwrap_or((0.0, 0.0)),
             DragTarget::Flagpole => (self.data.flagpole.x, self.data.flagpole.y),
+            DragTarget::Key(i) => self.data.keys.get(i).map(|k| (k.x, k.y)).unwrap_or((0.0, 0.0)),
         }
     }
 
@@ -301,6 +316,8 @@ impl EditorState {
             Tool::Flagpole => { self.data.flagpole = Pos { x, y }; self.set_status("Flagpole moved."); }
             Tool::PlayerSpawn => { self.data.player_spawn = Pos { x, y }; self.set_status("Player spawn moved."); }
             Tool::Cloud => { self.data.clouds.push(crate::level::CloudSpawn { x, y, w: 64.0, h: 24.0, speed: 0.3, color: [1.0, 1.0, 1.0, 0.7], dark: false }); self.set_status("Cloud placed."); }
+            Tool::Portal => { let next_id = self.data.portals.iter().map(|p| p.id).max().unwrap_or(0) + 1; self.data.portals.push(crate::level::PortalSpawn { id: next_id, dest_id: next_id + 1, x, y, locked: false, key_color: None, destroyed: false }); self.set_status(&format!("Portal {} placed.", next_id)); }
+            Tool::Key => { self.data.keys.push(crate::editor::data::KeyDef { x, y, color: crate::level::KeyColor::Red }); self.set_status("Key placed."); }
             Tool::Eraser => { self.delete_at(x, y); }
             Tool::Drag => {} // handled in update.rs, never reaches here
             Tool::View => {} // no-op in View mode
@@ -321,6 +338,8 @@ impl EditorState {
         self.data.osc_fireballs.retain(|o| (o.x - x).abs() > tol || (o.top_y - y).abs() > tol);
         self.data.checkpoints.retain(|p| (p.x - x).abs() > tol || (p.y - y).abs() > tol);
         self.data.clouds.retain(|c| (c.x - x).abs() > tol * 4.0 || (c.y - y).abs() > tol * 4.0);
+        self.data.portals.retain(|p| (p.x - x).abs() > 20.0 || (p.y - y).abs() > 52.0);
+        self.data.keys.retain(|k| (k.x - x).abs() > tol || (k.y - y).abs() > tol);
         if self.entity_count() < before { self.dirty = true; self.set_status("Entity deleted."); }
     }
 
@@ -330,6 +349,8 @@ impl EditorState {
             + self.data.enemies.len() + self.data.dart_enemies.len()
             + self.data.osc_fireballs.len() + self.data.checkpoints.len()
             + self.data.clouds.len()
+            + self.data.portals.len()
+            + self.data.keys.len()
     }
 
     pub(crate) fn cancel_pending(&mut self) {
@@ -380,11 +401,36 @@ impl EditorState {
             DragTarget::Flagpole => vec![
                 ("x", "x", self.data.flagpole.x), ("y", "y", self.data.flagpole.y),
             ],
+            DragTarget::Key(i) => self.data.keys.get(*i).map(|k| {
+                let color_idx = match k.color {
+                    crate::level::KeyColor::Red => 0.0, crate::level::KeyColor::Orange => 1.0,
+                    crate::level::KeyColor::Yellow => 2.0, crate::level::KeyColor::Green => 3.0,
+                    crate::level::KeyColor::Blue => 4.0, crate::level::KeyColor::Indigo => 5.0,
+                    crate::level::KeyColor::Violet => 6.0,
+                };
+                vec![("x", "x", k.x), ("y", "y", k.y), ("color", "color", color_idx)]
+            }).unwrap_or_default(),
             DragTarget::Cloud(i) => self.data.clouds.get(*i).map(|c| vec![
                 ("x", "x", c.x), ("y", "y", c.y),
                 ("w", "w", c.w), ("h", "h", c.h),
                 ("speed", "speed", c.speed),
             ]).unwrap_or_default(),
+            DragTarget::Portal(i) => self.data.portals.get(*i).map(|p| {
+                let key_clr_idx = match p.key_color {
+                    Some(crate::level::KeyColor::Red) => 0.0, Some(crate::level::KeyColor::Orange) => 1.0,
+                    Some(crate::level::KeyColor::Yellow) => 2.0, Some(crate::level::KeyColor::Green) => 3.0,
+                    Some(crate::level::KeyColor::Blue) => 4.0, Some(crate::level::KeyColor::Indigo) => 5.0,
+                    Some(crate::level::KeyColor::Violet) => 6.0,
+                    None => 0.0,
+                };
+                vec![
+                    ("id", "id", p.id as f32), ("dest_id", "dest_id", p.dest_id as f32),
+                    ("x", "x", p.x), ("y", "y", p.y),
+                    ("locked", "locked", if p.locked { 1.0 } else { 0.0 }),
+                    ("key_clr", "key_clr", key_clr_idx),
+                    ("destroyed", "destroyed", if p.destroyed { 1.0 } else { 0.0 }),
+                ]
+            }).unwrap_or_default(),
         }
     }
 
@@ -433,10 +479,35 @@ impl EditorState {
                 "x" => { self.data.flagpole.x = value; true }
                 "y" => { self.data.flagpole.y = value; true } _ => false,
             },
+            DragTarget::Key(i) => self.data.keys.get_mut(*i).map(|k| match field_name {
+                "x" => { k.x = value; true }
+                "y" => { k.y = value; true }
+                "color" => { k.color = k.color.next(); true }
+                _ => false,
+            }).unwrap_or(false),
             DragTarget::Cloud(i) => self.data.clouds.get_mut(*i).map(|c| match field_name {
                 "x" => { c.x = value; true } "y" => { c.y = value; true }
                 "w" => { c.w = value.max(8.0); true } "h" => { c.h = value.max(8.0); true }
                 "speed" => { c.speed = value.clamp(0.0, 1.0); true }
+                _ => false,
+            }).unwrap_or(false),
+            DragTarget::Portal(i) => self.data.portals.get_mut(*i).map(|p| match field_name {
+                "x" => { p.x = value; true }
+                "y" => { p.y = value; true }
+                "id" => { p.id = value.max(1.0) as u32; true }
+                "dest_id" => { p.dest_id = value.max(0.0) as u32; true }
+                "locked" => { p.locked = value >= 0.5; true }
+                "key_clr" => {
+                    p.key_color = match value as i32 {
+                        0 => Some(crate::level::KeyColor::Red), 1 => Some(crate::level::KeyColor::Orange),
+                        2 => Some(crate::level::KeyColor::Yellow), 3 => Some(crate::level::KeyColor::Green),
+                        4 => Some(crate::level::KeyColor::Blue), 5 => Some(crate::level::KeyColor::Indigo),
+                        6 => Some(crate::level::KeyColor::Violet),
+                        _ => Some(crate::level::KeyColor::Red),
+                    };
+                    true
+                }
+                "destroyed" => { p.destroyed = value >= 0.5; true }
                 _ => false,
             }).unwrap_or(false),
         };
@@ -944,7 +1015,7 @@ mod tests {
 
     #[test]
     fn test_tool_all_has_all_variants() {
-        assert_eq!(Tool::ALL.len(), 15); // +Cloud
+        assert_eq!(Tool::ALL.len(), 17); // +Cloud, +Portal, +Key
     }
 
     #[test]

@@ -29,6 +29,7 @@ impl EditorState {
         if is_key_pressed(KeyCode::Key0) { self.tool = Tool::Flagpole; }
         if is_key_pressed(KeyCode::P) { self.tool = Tool::PlayerSpawn; }
         if is_key_pressed(KeyCode::C) { self.tool = Tool::Cloud; }
+        if is_key_pressed(KeyCode::T) { self.tool = Tool::Portal; }
         if is_key_pressed(KeyCode::Delete) || is_key_pressed(KeyCode::Backspace) { self.tool = Tool::Eraser; }
         if is_key_pressed(KeyCode::D) { self.tool = Tool::Drag; }
         if is_key_pressed(KeyCode::V) { self.tool = Tool::View; }
@@ -300,7 +301,29 @@ impl EditorState {
                 }
             }
 
-            // 2b. Properties panel (View mode, entity selected)
+            // 2b. Dropdown menu (if open) — check clicks on dropdown items first
+            if self.dropdown_field.is_some() {
+                let mut handled = false;
+                for (j, &(dx, dy, dw, dh)) in self.dropdown_rects.iter().enumerate() {
+                    if mx >= dx && mx <= dx + dw && my >= dy && my <= dy + dh {
+                        let val = j as f32;
+                        let field = self.dropdown_field.take().unwrap();
+                        self.set_entity_property(&field, val);
+                        self.set_status(&format!("Set {} = {}", field, val));
+                        self.dropdown_rects.clear();
+                        handled = true;
+                        break;
+                    }
+                }
+                if !handled {
+                    // Clicked outside dropdown → close it
+                    self.dropdown_field = None;
+                    self.dropdown_rects.clear();
+                }
+                return;
+            }
+
+            // 2c. Properties panel (View mode, entity selected)
             if self.selected_entity.is_some() {
                 let props = self.entity_properties();
                 if !props.is_empty() {
@@ -321,6 +344,29 @@ impl EditorState {
                         for (i, (_label, field_name, _value)) in props.iter().enumerate() {
                             let row_y = sep_y + 4.0 + i as f32 * row_h;
                             if my >= row_y && my <= row_y + row_h {
+                                // Bool fields toggle immediately, no edit buffer
+                                if *field_name == "locked" || *field_name == "destroyed" {
+                                    let cur = props[i].2;
+                                    let fname = field_name.to_string();
+                                    drop(props);
+                                    self.set_entity_property(&fname, if cur >= 0.5 { 0.0 } else { 1.0 });
+                                    self.set_status(&format!("Set {} = {}", fname, if cur >= 0.5 { "false" } else { "true" }));
+                                    return;
+                                }
+                                // Dropdown fields: toggle dropdown, no text edit
+                                if *field_name == "key_clr" || *field_name == "color" {
+                                    let fname = field_name.to_string();
+                                    let already_open = self.dropdown_field.as_deref() == Some(*field_name);
+                                    drop(props);
+                                    if already_open {
+                                        self.dropdown_field = None;
+                                    } else {
+                                        self.editing_field = None;
+                                        self.edit_buf.clear();
+                                        self.dropdown_field = Some(fname);
+                                    }
+                                    return;
+                                }
                                 // Discard any previous edit, start editing this field
                                 self.editing_field = Some(field_name.to_string());
                                 self.edit_buf.clear();

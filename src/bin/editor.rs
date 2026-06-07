@@ -5,7 +5,7 @@
 // See src/editor/mod.rs for the editor implementation.
 
 use mario_platformer::editor::EditorState;
-use mario_platformer::editor::render::init_cjk_font;
+use mario_platformer::init_cjk_font;
 use macroquad::prelude::*;
 
 fn window_conf() -> macroquad::window::Conf {

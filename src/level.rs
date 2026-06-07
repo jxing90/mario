@@ -35,6 +35,67 @@ pub enum Tile {
     Spike(AABB),
 }
 
+/// Key colors for locked portals. Serialized as lowercase strings in JSON.
+/// 7 rainbow colors: Red → Orange → Yellow → Green → Blue → Indigo → Violet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum KeyColor {
+    #[default]
+    #[serde(rename = "red")]
+    Red,
+    #[serde(rename = "orange")]
+    Orange,
+    #[serde(rename = "yellow")]
+    Yellow,
+    #[serde(rename = "green")]
+    Green,
+    #[serde(rename = "blue")]
+    Blue,
+    #[serde(rename = "indigo")]
+    Indigo,
+    #[serde(rename = "violet")]
+    Violet,
+}
+
+impl KeyColor {
+    /// Cycle to the next color. Returns the next color in rainbow order.
+    pub fn next(self) -> Self {
+        use KeyColor::*;
+        match self {
+            Red    => Orange,
+            Orange => Yellow,
+            Yellow => Green,
+            Green  => Blue,
+            Blue   => Indigo,
+            Indigo => Violet,
+            Violet => Red,
+        }
+    }
+
+    /// Human-readable name in Chinese.
+    pub fn chinese_name(self) -> &'static str {
+        match self {
+            KeyColor::Red    => "红色",
+            KeyColor::Orange => "橙色",
+            KeyColor::Yellow => "黄色",
+            KeyColor::Green  => "绿色",
+            KeyColor::Blue   => "蓝色",
+            KeyColor::Indigo => "靛色",
+            KeyColor::Violet => "紫色",
+        }
+    }
+    pub fn name(self) -> &'static str {
+        match self {
+            KeyColor::Red    => "Red",
+            KeyColor::Orange => "Orange",
+            KeyColor::Yellow => "Yellow",
+            KeyColor::Green  => "Green",
+            KeyColor::Blue   => "Blue",
+            KeyColor::Indigo => "Indigo",
+            KeyColor::Violet => "Violet",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Platform { pub aabb: AABB }
 
@@ -118,6 +179,33 @@ struct JsonLevel {
     theme: ThemeColors,
     #[serde(default)]
     clouds: Vec<CloudSpawn>,
+    #[serde(default)]
+    portals: Vec<PortalSpawn>,
+    #[serde(default)]
+    keys: Vec<KeySpawn>,
+}
+
+/// A warp portal — closed by default, opens on UP input, warps to dest_id.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortalSpawn {
+    pub id: u32,
+    pub dest_id: u32,
+    pub x: f32,
+    pub y: f32,
+    #[serde(default)]
+    pub locked: bool,
+    #[serde(default)]
+    pub key_color: Option<KeyColor>,
+    #[serde(default)]
+    pub destroyed: bool,
+}
+
+/// A collectible key that unlocks matching-color locked portals.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeySpawn {
+    pub x: f32,
+    pub y: f32,
+    pub color: KeyColor,
 }
 
 #[derive(Deserialize)]
@@ -197,6 +285,8 @@ pub struct Level {
     pub player_spawn: PlayerSpawn,
     pub theme: ThemeColors,
     pub cloud_spawns: Vec<CloudSpawn>,
+    pub portal_spawns: Vec<PortalSpawn>,
+    pub key_spawns: Vec<KeySpawn>,
 }
 
 impl Default for Level {
@@ -276,6 +366,8 @@ impl Level {
             pos: Vec2 { x: data.player_spawn.x, y: data.player_spawn.y },
         };
 
+        let key_spawns: Vec<KeySpawn> = data.keys;
+
         let name = if data.name.is_empty() {
             format!("Level {}", n)
         } else {
@@ -287,7 +379,9 @@ impl Level {
             dart_enemy_spawns, osc_fireball_spawns,
             checkpoint_spawns, flagpole_spawn, player_spawn,
             theme: data.theme,
-            cloud_spawns: data.clouds, }
+            cloud_spawns: data.clouds,
+            portal_spawns: data.portals,
+            key_spawns, }
     }
 
     pub fn platforms(&self) -> &[Platform] { &self.platforms }
