@@ -47,13 +47,14 @@ impl Flagpole {
 
     /// Returns the trigger-zone AABB for flagpole collision detection.
     ///
-    /// Dimensions: w=16, h=80, centered on `pos`.
+    /// Matches the visual: pole 120px tall above pos.y, plus 8px base below,
+    /// and wide enough to cover the flag extending right of the pole.
     pub fn collider(&self) -> AABB {
         AABB {
             x: self.pos.x - 8.0,
-            y: self.pos.y - 40.0,
-            w: 16.0,
-            h: 80.0,
+            y: self.pos.y - 120.0,
+            w: 40.0,   // pole (6) + flag (24) + margin
+            h: 128.0,  // pole (120) + base (8)
         }
     }
 

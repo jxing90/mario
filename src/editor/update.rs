@@ -28,6 +28,7 @@ impl EditorState {
         if is_key_pressed(KeyCode::Key9) { self.tool = Tool::Checkpoint; }
         if is_key_pressed(KeyCode::Key0) { self.tool = Tool::Flagpole; }
         if is_key_pressed(KeyCode::P) { self.tool = Tool::PlayerSpawn; }
+        if is_key_pressed(KeyCode::C) { self.tool = Tool::Cloud; }
         if is_key_pressed(KeyCode::Delete) || is_key_pressed(KeyCode::Backspace) { self.tool = Tool::Eraser; }
         if is_key_pressed(KeyCode::D) { self.tool = Tool::Drag; }
         if is_key_pressed(KeyCode::V) { self.tool = Tool::View; }
@@ -370,9 +371,12 @@ impl EditorState {
                     // Drag mode: only move existing entities, never place new ones
                     if let Some(target) = self.hit_test(wx, wy) {
                         self.drag_target = Some(target);
-                        // Store offset so entity keeps its grab point during drag
+                        // Store offset from entity origin to snapped mouse pos.
+                        // Using snap here (not raw) matches the drag update below,
+                        // preventing the entity from jumping on initial click.
                         let (ex, ey) = self.entity_pos(target);
-                        self.drag_offset = (ex - wx, ey - wy);
+                        let (sx, sy) = self.snap_pos(wx, wy);
+                        self.drag_offset = (ex - sx, ey - sy);
                         // Also select for property inspection
                         self.selected_entity = Some(target);
                         self.editing_field = None;

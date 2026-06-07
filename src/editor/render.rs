@@ -184,6 +184,22 @@ impl EditorState {
             draw_text("START", sx + sz * 0.7, sy - sz * 1.2, 10.0 * self.zoom, YELLOW);
         }
 
+        // ── Clouds ──
+        for c in &self.data.clouds {
+            let (cx, cy) = ws(c.x, c.y);
+            let cw = c.w * self.zoom;
+            let ch = c.h * self.zoom;
+            let alpha = c.color[3];
+            let cc = if c.dark {
+                Color::new(0.35, 0.35, 0.40, alpha)
+            } else {
+                Color::new(c.color[0], c.color[1], c.color[2], alpha)
+            };
+            draw_ellipse(cx + cw * 0.5, cy + ch * 0.3, cw, ch * 0.55, 0.0, cc);
+            draw_ellipse(cx + cw * 0.15, cy + ch * 0.4, cw * 0.65, ch * 0.45, 0.0, cc);
+            draw_ellipse(cx + cw * 0.6, cy + ch * 0.25, cw * 0.55, ch * 0.4, 0.0, cc);
+        }
+
         // ── Pending placement preview ──
         if let Some((sx, sy)) = self.plat_start {
             let (mx2, my2) = mouse_position();
@@ -420,6 +436,7 @@ impl EditorState {
             crate::editor::tool::DragTarget::Checkpoint(_) => "Checkpoint".into(),
             crate::editor::tool::DragTarget::PlayerSpawn => "Player Spawn".into(),
             crate::editor::tool::DragTarget::Flagpole => "Flagpole".into(),
+            crate::editor::tool::DragTarget::Cloud(_) => "Cloud".into(),
         }
     }
 }

@@ -65,6 +65,10 @@ pub(crate) struct LevelData {
     pub(crate) player_spawn: Pos,
     #[serde(default = "default_parallax")]
     pub(crate) parallax: Vec<f32>,
+    #[serde(default)]
+    pub(crate) theme: crate::level::ThemeColors,
+    #[serde(default)]
+    pub(crate) clouds: Vec<crate::level::CloudSpawn>,
 }
 
 fn default_parallax() -> Vec<f32> {
@@ -94,6 +98,8 @@ impl Default for LevelData {
             flagpole: Pos { x: 3500.0, y: 560.0 },
             player_spawn: Pos { x: 100.0, y: 600.0 },
             parallax: default_parallax(),
+            theme: crate::level::ThemeColors::default(),
+            clouds: vec![],
         }
     }
 }

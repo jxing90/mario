@@ -456,11 +456,14 @@ impl PlayingState {
 
         // Coins — check with post-move collider
         let mut coin_collected = false;
+        let mut one_up_earned = false;
         let post_aabb = self.player.collider();
         for coin in self.coins.iter_mut() {
             if !coin.collected && post_aabb.intersects(&coin.collider()) {
                 coin.collected = true;
-                self.player.coins += 1;
+                if self.player.add_coin() {
+                    one_up_earned = true;
+                }
                 coin_collected = true;
             }
         }
@@ -519,7 +522,9 @@ impl PlayingState {
                     // Random roll from xorshift64 RNG (pre-generated before loop)
                     let roll = block_roll;
                     if roll < 0.60 {
-                        self.player.coins += 1;
+                        if self.player.add_coin() {
+                            one_up_earned = true;
+                        }
                     } else {
                         // Spawn a PowerUp entity that bounces out of the block
                         let kind = if roll < 0.75 {
@@ -542,6 +547,9 @@ impl PlayingState {
         }
         if block_hit {
             self.sfx(SoundManager::play_bump);
+        }
+        if one_up_earned {
+            self.sfx(SoundManager::play_oneup);
         }
 
         // 4b. Resolve terrain collisions (ceiling / wall / floor).
@@ -905,35 +913,37 @@ impl PlayingState {
             ((wx - cam.x) * sx, (wy - cam.y) * sy)
         };
 
-        // ── 1. Background (themed per level) ──
+        // ── 1. Background (from level JSON theme) ──
         use macroquad::color::Color;
-        let (bg_color, ground_color, plat_color, spike_color) = match self.current_level {
-            1 => (  // Green Plains: blue sky, green ground, brown bricks
-                Color::new(0.35, 0.65, 0.95, 1.0),
-                Color::new(0.40, 0.75, 0.30, 1.0),
-                Color::new(0.55, 0.35, 0.15, 1.0),
-                Color::new(0.9, 0.2, 0.1, 1.0),
-            ),
-            2 => (  // Underground: dark cavern, gray stone, blue-gray bricks
-                Color::new(0.05, 0.05, 0.12, 1.0),
-                Color::new(0.25, 0.25, 0.30, 1.0),
-                Color::new(0.40, 0.45, 0.55, 1.0),
-                Color::new(0.85, 0.15, 0.05, 1.0),
-            ),
-            3 => (  // Sky World: light blue, white clouds, golden platforms
-                Color::new(0.55, 0.80, 1.0, 1.0),
-                Color::new(0.85, 0.90, 0.95, 1.0),
-                Color::new(0.95, 0.75, 0.30, 1.0),
-                Color::new(0.7, 0.15, 0.55, 1.0),
-            ),
-            _ => (  // Castle: dark red-black, dark stone, gray bricks
-                Color::new(0.08, 0.02, 0.04, 1.0),
-                Color::new(0.30, 0.25, 0.25, 1.0),
-                Color::new(0.50, 0.45, 0.45, 1.0),
-                Color::new(1.0, 0.25, 0.05, 1.0),
-            ),
-        };
+        let t = &self.level.theme;
+        let arr2c = |a: &[f32; 4]| Color::new(a[0], a[1], a[2], a[3]);
+        let bg_color = arr2c(&t.bg);
+        let ground_color = arr2c(&t.ground);
+        let plat_color = arr2c(&t.platform);
+        let spike_color = arr2c(&t.spike);
         macroquad::prelude::clear_background(bg_color);
+
+        // ── 1b. Background clouds (parallax, drawn behind platforms) ──
+        use macroquad::shapes::draw_ellipse;
+        let cam_offset = self.camera.offset();
+        for cloud in &self.level.cloud_spawns {
+            let cx = cloud.x - cam_offset.x * cloud.speed;
+            let cy = cloud.y;
+            let (csx, csy) = ws(cx, cy);
+            let arr2c2 = |a: &[f32; 4]| Color::new(a[0], a[1], a[2], a[3]);
+            let cc = arr2c2(&cloud.color);
+            if cloud.dark {
+                // Dark storm cloud: multiple overlapping ellipses
+                draw_ellipse(csx, csy, cloud.w * sx, cloud.h * sy * 0.6, 0.0, cc);
+                draw_ellipse(csx - cloud.w * 0.3 * sx, csy + cloud.h * 0.15 * sy, cloud.w * 0.7 * sx, cloud.h * 0.5 * sy, 0.0, cc);
+                draw_ellipse(csx + cloud.w * 0.25 * sx, csy - cloud.h * 0.1 * sy, cloud.w * 0.6 * sx, cloud.h * 0.45 * sy, 0.0, cc);
+            } else {
+                // Fluffy white cloud: three overlapping ellipses
+                draw_ellipse(csx, csy, cloud.w * sx, cloud.h * sy * 0.55, 0.0, cc);
+                draw_ellipse(csx - cloud.w * 0.35 * sx, csy + cloud.h * 0.1 * sy, cloud.w * 0.65 * sx, cloud.h * 0.45 * sy, 0.0, cc);
+                draw_ellipse(csx + cloud.w * 0.3 * sx, csy - cloud.h * 0.05 * sy, cloud.w * 0.55 * sx, cloud.h * 0.4 * sy, 0.0, cc);
+            }
+        }
 
         // ── 2. Platforms (drawn from Level data) ──
         use macroquad::shapes::draw_rectangle;
@@ -1022,9 +1032,9 @@ impl PlayingState {
         let p = self.player.pos();
         let (spx, spy) = ws(p.x, p.y);
         let is_small = matches!(self.player.state, crate::entities::player::PlayerState::Small);
-        let body_w = if is_small { 16.0 } else { 32.0 };
-        // When crouching, the body height shrinks to 16 while width stays the same.
-        let body_h = if self.player.crouching { 16.0 } else { body_w };
+        let body_w = 16.0; // width always 16px (same as collider)
+        // Height: Small=16, Super/Fire=32, crouch=16
+        let body_h = if self.player.crouching || is_small { 16.0 } else { 32.0 };
         // Vertical scale: uses actual body height. Horizontal scale: uses body width.
         let unit_v = body_h / 16.0;
         let sx_s = sx * body_w / 16.0;
@@ -1066,8 +1076,9 @@ impl PlayingState {
             draw_rectangle(spx - 2.0 * sx_s, top + 3.0 * sy_s, 20.0 * sx_s, 3.0 * sy_s, hat_color);
             // Face (units 5-9)
             draw_rectangle(spx, top + 5.0 * sy_s, 16.0 * sx_s, 4.0 * sy_s, skin_color);
-            // Eye
-            draw_rectangle(spx + 10.0 * sx_s, top + 5.5 * sy_s, 3.0 * sx_s, 2.0 * sy_s, eye_color);
+            // Eye — shifts side based on facing direction
+            let eye_x = if self.player.facing > 0 { spx + 10.0 * sx_s } else { spx + 3.0 * sx_s };
+            draw_rectangle(eye_x, top + 5.5 * sy_s, 3.0 * sx_s, 2.0 * sy_s, eye_color);
             // Overall (units 9-14)
             draw_rectangle(spx, top + 9.0 * sy_s, 16.0 * sx_s, 5.0 * sy_s, overall_color);
             // Buttons
@@ -1083,9 +1094,14 @@ impl PlayingState {
         let stats = self.player.stats();
         let y_pos = 12.0 * sy; // single row near top
         
-        // Column 1: World
+        // Column 1: World (from level JSON name, fallback to WORLD 1-n)
+        let world_label = if self.level.name.is_empty() {
+            format!("WORLD 1-{}", self.current_level)
+        } else {
+            self.level.name.clone()
+        };
         draw_text(
-            &format!("WORLD 1-{}", self.current_level),
+            &world_label,
             8.0,
             y_pos,
             font_size,

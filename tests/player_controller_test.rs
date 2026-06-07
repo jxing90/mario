@@ -1858,3 +1858,39 @@ fn t37_side_slide_wall_not_ceiling() {
     assert!(player.vel.y > PHYSICS_EPSILON,
         "T37: Side slide must NOT stop vertical movement. vel.y={}", player.vel.y);
 }
+
+// ============================================================================
+// Feature: 100-coin → extra life (1UP)
+// ============================================================================
+
+#[test]
+fn t38_add_coin_100_awards_1up() {
+    use mario_platformer::entities::player::{Player, PlayerConfig};
+    let config = PlayerConfig::default();
+    let mut player = Player::new(config);
+
+    // Start at 99 coins, 3 lives
+    player.coins = 99;
+    player.lives = 3;
+
+    // 100th coin: should trigger 1UP
+    let one_up = player.add_coin();
+    assert!(one_up, "T38a: 100th coin must award 1UP");
+    assert_eq!(player.coins, 0, "T38b: coins reset to 0 after 1UP");
+    assert_eq!(player.lives, 4, "T38c: lives increase from 3 to 4");
+
+    // Next coin: normal increment
+    let one_up2 = player.add_coin();
+    assert!(!one_up2, "T38d: 1st coin after reset should not trigger");
+    assert_eq!(player.coins, 1, "T38e: coins should be 1");
+    assert_eq!(player.lives, 4, "T38f: lives unchanged");
+
+    // Test at exactly 100 (edge case: if coins were set to 100 directly,
+    // add_coin should still trigger since >= 100)
+    player.coins = 100;
+    player.lives = 5;
+    let one_up3 = player.add_coin();
+    assert!(one_up3, "T38g: at 100 coins, next coin triggers 1UP");
+    assert_eq!(player.coins, 0, "T38h: coins reset");
+    assert_eq!(player.lives, 6, "T38i: lives increase");
+}

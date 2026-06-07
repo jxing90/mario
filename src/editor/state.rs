@@ -168,6 +168,15 @@ impl EditorState {
         if (wx - ps.x).abs() <= tol * 2.0 && (wy - ps.y).abs() <= tol * 2.0 {
             return Some(DragTarget::PlayerSpawn);
         }
+        for (i, c) in self.data.clouds.iter().enumerate() {
+            let cx = c.x + c.w / 2.0;
+            let cy = c.y + c.h / 2.0;
+            if wx >= cx - c.w / 2.0 - tol && wx <= cx + c.w / 2.0 + tol
+                && wy >= cy - c.h / 2.0 - tol && wy <= cy + c.h / 2.0 + tol
+            {
+                return Some(DragTarget::Cloud(i));
+            }
+        }
         None
     }
 
@@ -194,6 +203,7 @@ impl EditorState {
             }
             DragTarget::Checkpoint(i) => { if let Some(cp) = self.data.checkpoints.get_mut(i) { cp.x = x; cp.y = y; } }
             DragTarget::PlayerSpawn => { self.data.player_spawn = Pos { x, y }; }
+            DragTarget::Cloud(i) => { if let Some(c) = self.data.clouds.get_mut(i) { c.x = x; c.y = y; } }
             DragTarget::Flagpole => { self.data.flagpole = Pos { x, y }; }
         }
     }
@@ -211,6 +221,7 @@ impl EditorState {
             DragTarget::OscFireball(i) => self.data.osc_fireballs.get(i).map(|o| (o.x, o.top_y)).unwrap_or((0.0, 0.0)),
             DragTarget::Checkpoint(i) => self.data.checkpoints.get(i).map(|c| (c.x, c.y)).unwrap_or((0.0, 0.0)),
             DragTarget::PlayerSpawn => (self.data.player_spawn.x, self.data.player_spawn.y),
+            DragTarget::Cloud(i) => self.data.clouds.get(i).map(|c| (c.x, c.y)).unwrap_or((0.0, 0.0)),
             DragTarget::Flagpole => (self.data.flagpole.x, self.data.flagpole.y),
         }
     }
@@ -288,7 +299,8 @@ impl EditorState {
             }
             Tool::Checkpoint => { self.data.checkpoints.push(Pos { x, y }); self.set_status("Checkpoint placed."); }
             Tool::Flagpole => { self.data.flagpole = Pos { x, y }; self.set_status("Flagpole moved."); }
-            Tool::PlayerSpawn => { self.data.player_spawn = Pos { x, y }; self.set_status("Player spawn set."); }
+            Tool::PlayerSpawn => { self.data.player_spawn = Pos { x, y }; self.set_status("Player spawn moved."); }
+            Tool::Cloud => { self.data.clouds.push(crate::level::CloudSpawn { x, y, w: 64.0, h: 24.0, speed: 0.3, color: [1.0, 1.0, 1.0, 0.7], dark: false }); self.set_status("Cloud placed."); }
             Tool::Eraser => { self.delete_at(x, y); }
             Tool::Drag => {} // handled in update.rs, never reaches here
             Tool::View => {} // no-op in View mode
@@ -308,6 +320,7 @@ impl EditorState {
         self.data.dart_enemies.retain(|p| (p.x - x).abs() > tol || (p.y - y).abs() > tol);
         self.data.osc_fireballs.retain(|o| (o.x - x).abs() > tol || (o.top_y - y).abs() > tol);
         self.data.checkpoints.retain(|p| (p.x - x).abs() > tol || (p.y - y).abs() > tol);
+        self.data.clouds.retain(|c| (c.x - x).abs() > tol * 4.0 || (c.y - y).abs() > tol * 4.0);
         if self.entity_count() < before { self.dirty = true; self.set_status("Entity deleted."); }
     }
 
@@ -316,6 +329,7 @@ impl EditorState {
             + self.data.question_blocks.len() + self.data.bricks.len()
             + self.data.enemies.len() + self.data.dart_enemies.len()
             + self.data.osc_fireballs.len() + self.data.checkpoints.len()
+            + self.data.clouds.len()
     }
 
     pub(crate) fn cancel_pending(&mut self) {
@@ -366,6 +380,11 @@ impl EditorState {
             DragTarget::Flagpole => vec![
                 ("x", "x", self.data.flagpole.x), ("y", "y", self.data.flagpole.y),
             ],
+            DragTarget::Cloud(i) => self.data.clouds.get(*i).map(|c| vec![
+                ("x", "x", c.x), ("y", "y", c.y),
+                ("w", "w", c.w), ("h", "h", c.h),
+                ("speed", "speed", c.speed),
+            ]).unwrap_or_default(),
         }
     }
 
@@ -414,6 +433,12 @@ impl EditorState {
                 "x" => { self.data.flagpole.x = value; true }
                 "y" => { self.data.flagpole.y = value; true } _ => false,
             },
+            DragTarget::Cloud(i) => self.data.clouds.get_mut(*i).map(|c| match field_name {
+                "x" => { c.x = value; true } "y" => { c.y = value; true }
+                "w" => { c.w = value.max(8.0); true } "h" => { c.h = value.max(8.0); true }
+                "speed" => { c.speed = value.clamp(0.0, 1.0); true }
+                _ => false,
+            }).unwrap_or(false),
         };
         if ok { self.dirty = true; }
         ok
@@ -919,7 +944,7 @@ mod tests {
 
     #[test]
     fn test_tool_all_has_all_variants() {
-        assert_eq!(Tool::ALL.len(), 14);
+        assert_eq!(Tool::ALL.len(), 15); // +Cloud
     }
 
     #[test]

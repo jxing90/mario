@@ -527,6 +527,19 @@ impl Player {
         }
     }
 
+    /// Adds one coin. When coins reach 100, resets to 0 and awards an extra life.
+    /// Returns true if a 1-UP was awarded (for sound effect / visual feedback).
+    pub fn add_coin(&mut self) -> bool {
+        self.coins += 1;
+        if self.coins >= 100 {
+            self.coins = 0;
+            self.lives += 1;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Returns the player's collision box as an AABB.
     ///
     /// The AABB is anchored at the player's foot position:

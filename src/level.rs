@@ -3,7 +3,7 @@
 
 use crate::entities::hazard::Spike;
 use crate::parallax::ParallaxLayer;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Geometry Primitives
@@ -49,6 +49,43 @@ pub struct LevelBounds { pub min_x: f32, pub max_x: f32, pub min_y: f32, pub kil
 // JSON data shapes (serde)
 // ============================================================================
 
+/// Background theme colors stored per-level in JSON.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThemeColors {
+    pub bg:       [f32; 4],  // sky clear color
+    pub ground:   [f32; 4],  // ground-level platforms
+    pub platform: [f32; 4],  // elevated platforms
+    pub spike:    [f32; 4],  // spike tint
+}
+
+impl Default for ThemeColors {
+    fn default() -> Self {
+        ThemeColors {
+            bg:       [0.35, 0.65, 0.95, 1.0],
+            ground:   [0.40, 0.75, 0.30, 1.0],
+            platform: [0.55, 0.35, 0.15, 1.0],
+            spike:    [0.90, 0.20, 0.10, 1.0],
+        }
+    }
+}
+
+/// A decorative background cloud with parallax scrolling.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudSpawn {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub speed: f32,        // parallax factor (0.0 = static, 1.0 = match camera)
+    #[serde(default = "default_cloud_color")]
+    pub color: [f32; 4],   // RGBA
+    /// If true, render as a dark storm-cloud instead of white fluffy.
+    #[serde(default)]
+    pub dark: bool,
+}
+
+fn default_cloud_color() -> [f32; 4] { [1.0, 1.0, 1.0, 0.7] }
+
 #[derive(Deserialize)]
 struct JsonLevel {
     #[serde(default)]
@@ -77,6 +114,10 @@ struct JsonLevel {
     player_spawn: JsonPos,
     #[serde(default = "default_parallax")]
     parallax: Vec<f32>,
+    #[serde(default)]
+    theme: ThemeColors,
+    #[serde(default)]
+    clouds: Vec<CloudSpawn>,
 }
 
 #[derive(Deserialize)]
@@ -154,6 +195,8 @@ pub struct Level {
     pub checkpoint_spawns: Vec<CheckpointSpawn>,
     pub flagpole_spawn: FlagpoleSpawn,
     pub player_spawn: PlayerSpawn,
+    pub theme: ThemeColors,
+    pub cloud_spawns: Vec<CloudSpawn>,
 }
 
 impl Default for Level {
@@ -242,7 +285,9 @@ impl Level {
         Level { name, platforms, spikes, bounds, parallax_layers,
             coin_spawns, block_spawns, brick_spawns, enemy_spawns,
             dart_enemy_spawns, osc_fireball_spawns,
-            checkpoint_spawns, flagpole_spawn, player_spawn }
+            checkpoint_spawns, flagpole_spawn, player_spawn,
+            theme: data.theme,
+            cloud_spawns: data.clouds, }
     }
 
     pub fn platforms(&self) -> &[Platform] { &self.platforms }

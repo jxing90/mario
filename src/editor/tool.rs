@@ -19,6 +19,7 @@ pub(crate) enum Tool {
     Checkpoint,
     Flagpole,
     PlayerSpawn,
+    Cloud,
     Eraser,
 }
 
@@ -37,6 +38,7 @@ impl Tool {
         Tool::Checkpoint,
         Tool::Flagpole,
         Tool::PlayerSpawn,
+        Tool::Cloud,
         Tool::Eraser,
     ];
 
@@ -55,6 +57,7 @@ impl Tool {
             Tool::Checkpoint => "ChkPt",
             Tool::Flagpole => "Flagpole",
             Tool::PlayerSpawn => "Player",
+            Tool::Cloud => "Cloud",
             Tool::Eraser => "Eraser",
         }
     }
@@ -74,6 +77,7 @@ impl Tool {
             Tool::Checkpoint => "9",
             Tool::Flagpole => "0",
             Tool::PlayerSpawn => "P",
+            Tool::Cloud => "C",
             Tool::Eraser => "Del",
         }
     }
@@ -92,6 +96,7 @@ pub(crate) enum DragTarget {
     OscFireball(usize),
     Checkpoint(usize),
     PlayerSpawn,
+    Cloud(usize),
     Flagpole,
 }
 
