@@ -1216,101 +1216,38 @@ impl PlayingState {
         }
 
         // ── 10. HUD (screen-space overlay, horizontal) ──
-        let font_size = 14.0 * sx.min(sy);
         let stats = self.player.stats();
-        let y_pos = 12.0 * sy; // single row near top
-        
-        // Column 1: World (from level JSON name, fallback to WORLD 1-n)
         let world_label = if self.level.name.is_empty() {
             format!("WORLD 1-{}", self.current_level)
         } else {
             self.level.name.clone()
         };
-        draw_text(
-            &world_label,
-            8.0,
-            y_pos,
-            font_size,
-            macroquad::color::WHITE,
-        );
-        // Column 2: Coins
-        draw_text(
-            &format!("COINS {}", stats.coins),
-            150.0 * sx,
-            y_pos,
-            font_size,
-            macroquad::color::Color::new(1.0, 0.85, 0.0, 1.0),
-        );
-        // Column 3: Lives
-        draw_text(
-            &format!("LIVES {}", stats.lives),
-            280.0 * sx,
-            y_pos,
-            font_size,
-            macroquad::color::Color::new(1.0, 0.3, 0.3, 1.0),
-        );
-        // Column 4: Time
-        let time_color = if self.time_remaining <= 60.0 {
-            macroquad::color::Color::new(1.0, 0.2, 0.2, 1.0) // red when urgent
-        } else {
-            macroquad::color::WHITE
+
+        let keys: Vec<(crate::level::KeyColor, u32)> = {
+            use crate::level::KeyColor;
+            [KeyColor::Red, KeyColor::Orange, KeyColor::Yellow,
+             KeyColor::Green, KeyColor::Blue, KeyColor::Indigo, KeyColor::Violet]
+                .iter()
+                .map(|&kc| {
+                    let count = self.keys.iter().filter(|k| k.collected && k.color == kc).count() as u32;
+                    (kc, count)
+                })
+                .collect()
         };
-        draw_text(
-            &format!("TIME {}", self.time_remaining as u32),
-            430.0 * sx,
-            y_pos,
-            font_size,
-            time_color,
-        );
-        // Column 5: Collected keys (colored squares + count)
-        let key_x = 580.0 * sx;
-        let key_colors = [
-            crate::level::KeyColor::Red,
-            crate::level::KeyColor::Orange,
-            crate::level::KeyColor::Yellow,
-            crate::level::KeyColor::Green,
-            crate::level::KeyColor::Blue,
-            crate::level::KeyColor::Indigo,
-            crate::level::KeyColor::Violet,
-        ];
-        for (i, &kc) in key_colors.iter().enumerate() {
-            let count = self.keys.iter().filter(|k| k.collected && k.color == kc).count();
-            if count > 0 {
-                let kx = key_x + i as f32 * 32.0 * sx;
-                let rgba = crate::entities::key::key_color_rgba(kc);
-                draw_rectangle(kx, y_pos - 2.0 * sy, 10.0 * sx, 10.0 * sy, rgba);
-                draw_text(
-                    &format!("x{}", count),
-                    kx + 13.0 * sx,
-                    y_pos,
-                    font_size,
-                    macroquad::color::WHITE,
-                );
-            }
-        }
-        // Star power countdown (inline when active)
-        if self.player.star_timer > 0.0 {
-            let star_color = macroquad::color::Color::new(1.0, 0.85, 0.0, 1.0);
-            draw_text(
-                &format!("STAR {:.1}", self.player.star_timer),
-                560.0 * sx,
-                y_pos,
-                font_size,
-                star_color,
-            );
-        }
-        // Hint text (centered, screen-space, fades with timer)
-        if !self.hint_text.is_empty() {
-            let hint_font = 22.0 * sx.min(sy);
-            let alpha = (self.hint_timer / 2.0).min(1.0);
-            let hc = macroquad::color::Color::new(1.0, 0.85, 0.3, alpha);
-            crate::draw_text_cjk(
-                &self.hint_text,
-                sw / 2.0 - hint_font * self.hint_text.len() as f32 * 0.3,
-                sh * 0.55,
-                hint_font,
-                hc,
-            );
-        }
+
+        crate::systems::hud::render_hud_bar(&crate::systems::hud::HudBarContext {
+            screen_w: sw,
+            screen_h: sh,
+            sx,
+            sy,
+            world_label,
+            coins: stats.coins,
+            lives: stats.lives,
+            time_remaining: self.time_remaining,
+            star_timer: self.player.star_timer,
+            keys,
+            hint_text: self.hint_text.clone(),
+            hint_timer: self.hint_timer,
+        });
     }
 }

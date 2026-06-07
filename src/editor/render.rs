@@ -224,6 +224,13 @@ impl EditorState {
             }
         }
 
+        // ── Keys ──
+        for k in &self.data.keys {
+            let (kx, ky) = ws(k.x, k.y);
+            let rgba = crate::entities::key::key_color_rgba(k.color);
+            crate::systems::hud::draw_key_shape(kx, ky, self.zoom, rgba);
+        }
+
         // ── Pending placement preview ──
         if let Some((sx, sy)) = self.plat_start {
             let (mx2, my2) = mouse_position();

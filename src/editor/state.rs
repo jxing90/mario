@@ -188,6 +188,11 @@ impl EditorState {
                 return Some(DragTarget::Portal(i));
             }
         }
+        for (i, k) in self.data.keys.iter().enumerate() {
+            if (wx - k.x).abs() <= tol && (wy - k.y).abs() <= tol {
+                return Some(DragTarget::Key(i));
+            }
+        }
         None
     }
 
